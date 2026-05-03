@@ -24,6 +24,9 @@ const MAX_LIVES = 3;
 // Points per row (row 0 = top)
 const POINTS = [30, 20, 10, 10];
 
+// Score multiplier per difficulty
+const SCORE_MULTIPLIER = { easy: 1, medium: 2, hard: 3 };
+
 // Difficulty presets
 const DIFFICULTY = {
   easy:   { enemySpeed: 0.6, speedMult: 1.10, shootInterval: 2200 },
@@ -183,21 +186,80 @@ function playWaveClearSound() {
   } catch (_) {}
 }
 
-/** Player-hit sound */
+/** Dramatic layered explosion when player ship is hit */
 function playHitSound() {
   try {
-    const ac  = getAudioCtx();
-    const osc = ac.createOscillator();
-    const gain = ac.createGain();
-    osc.connect(gain);
-    gain.connect(ac.destination);
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(160, ac.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(60, ac.currentTime + 0.3);
-    gain.gain.setValueAtTime(0.3, ac.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.3);
-    osc.start(ac.currentTime);
-    osc.stop(ac.currentTime + 0.3);
+    const ac = getAudioCtx();
+    const t  = ac.currentTime;
+
+    // ── Layer 1: Deep bass thud (low sine, fast decay) ────────
+    const bassOsc  = ac.createOscillator();
+    const bassGain = ac.createGain();
+    bassOsc.type = 'sine';
+    bassOsc.frequency.setValueAtTime(80, t);
+    bassOsc.frequency.exponentialRampToValueAtTime(25, t + 0.4);
+    bassGain.gain.setValueAtTime(1.2, t);
+    bassGain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    bassOsc.connect(bassGain);
+    bassGain.connect(ac.destination);
+    bassOsc.start(t);
+    bassOsc.stop(t + 0.5);
+
+    // ── Layer 2: Mid crunch (sawtooth distorted) ──────────────
+    const crunchOsc  = ac.createOscillator();
+    const crunchDist = ac.createWaveShaper();
+    const crunchGain = ac.createGain();
+    crunchOsc.type = 'sawtooth';
+    crunchOsc.frequency.setValueAtTime(220, t);
+    crunchOsc.frequency.exponentialRampToValueAtTime(40, t + 0.35);
+    // Heavy distortion curve
+    const curve = new Float32Array(256);
+    for (let i = 0; i < 256; i++) {
+      const x = (i * 2) / 256 - 1;
+      curve[i] = (Math.PI + 300) * x / (Math.PI + 300 * Math.abs(x));
+    }
+    crunchDist.curve = curve;
+    crunchGain.gain.setValueAtTime(0.6, t);
+    crunchGain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+    crunchOsc.connect(crunchDist);
+    crunchDist.connect(crunchGain);
+    crunchGain.connect(ac.destination);
+    crunchOsc.start(t);
+    crunchOsc.stop(t + 0.35);
+
+    // ── Layer 3: White noise burst (debris/shrapnel) ──────────
+    const bufLen  = Math.floor(ac.sampleRate * 0.6);
+    const buf     = ac.createBuffer(1, bufLen, ac.sampleRate);
+    const data    = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+    const noise     = ac.createBufferSource();
+    const noiseFilter = ac.createBiquadFilter();
+    const noiseGain = ac.createGain();
+    noise.buffer    = buf;
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.setValueAtTime(1200, t);
+    noiseFilter.frequency.exponentialRampToValueAtTime(300, t + 0.6);
+    noiseFilter.Q.value = 0.8;
+    noiseGain.gain.setValueAtTime(0.5, t);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(ac.destination);
+    noise.start(t);
+
+    // ── Layer 4: Shockwave sub-rumble (very low, short) ───────
+    const subOsc  = ac.createOscillator();
+    const subGain = ac.createGain();
+    subOsc.type = 'sine';
+    subOsc.frequency.setValueAtTime(45, t);
+    subOsc.frequency.exponentialRampToValueAtTime(18, t + 0.25);
+    subGain.gain.setValueAtTime(0.9, t);
+    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    subOsc.connect(subGain);
+    subGain.connect(ac.destination);
+    subOsc.start(t);
+    subOsc.stop(t + 0.25);
+
   } catch (_) {}
 }
 
@@ -384,6 +446,12 @@ function updateHUD() {
   document.getElementById('hud-score').textContent = score;
   document.getElementById('hud-wave').textContent  = wave;
   document.getElementById('hud-hi').textContent    = hiScore;
+
+  // Show active score multiplier in the wave display
+  const mult = SCORE_MULTIPLIER[difficulty] || 1;
+  if (mult > 1) {
+    document.getElementById('hud-wave').textContent = `${wave}  ×${mult}`;
+  }
 
   const msgEl = document.getElementById('hud-msg');
   if (waveMsg && Date.now() < waveMsgTime) {
@@ -608,7 +676,7 @@ function update(timestamp) {
       if (b.x > e.x && b.x < e.x + e.w && b.y > e.y && b.y < e.y + e.h) {
         e.alive = false;
         bullets.splice(bi, 1);
-        score += POINTS[e.row] || 10;
+        score += (POINTS[e.row] || 10) * (SCORE_MULTIPLIER[difficulty] || 1);
         spawnParticles(e.x + e.w / 2, e.y + e.h / 2, e.color);
         playExplosionSound();
         break;
