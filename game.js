@@ -124,6 +124,9 @@ let mysteryOscGain = null;
 // ── Floating score texts ─────────────────────────────────────
 let floatingTexts = [];   // { x, y, text, life, decay }
 
+// ── Bunkers (destructible shields) ──────────────────────────
+let bunkers = [];   // { x, y, w, h, health, maxHealth, chunks[] }
+
 // Invincibility after being hit
 let invincible      = false;
 let invincibleUntil = 0;
@@ -393,6 +396,31 @@ function playMysteryHitSound() {
   } catch (_) {}
 }
 
+/** Short low thud when a bunker chunk is hit */
+function playBunkerHitSound() {
+  try {
+    const ac     = getAudioCtx();
+    const t      = ac.currentTime;
+    const bufLen = Math.floor(ac.sampleRate * 0.08);
+    const buf    = ac.createBuffer(1, bufLen, ac.sampleRate);
+    const data   = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+    const src    = ac.createBufferSource();
+    src.buffer   = buf;
+    const filter = ac.createBiquadFilter();
+    filter.type  = 'bandpass';
+    filter.frequency.setValueAtTime(300, t);
+    filter.Q.value = 1.5;
+    const gain   = ac.createGain();
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(ac.destination);
+    gain.gain.setValueAtTime(0.15, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    src.start(t);
+  } catch (_) {}
+}
+
 // ── Supabase leaderboard ─────────────────────────────────────
 const SUPABASE_URL = 'https://waqephjzfgdtfmugbobo.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhcWVwaGp6ZmdkdGZtdWdib2JvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4MzM4NjIsImV4cCI6MjA5MzQwOTg2Mn0.1or5dsYAEgMjSnfGA0oWRgzhKkhLC5bK-Ygkl8lGiZA';
@@ -529,6 +557,103 @@ function buildEnemies() {
 
   enemyDir = 1;
   enemyX   = 0;
+}
+
+// ── Bunkers ──────────────────────────────────────────────────
+const BUNKER_COLS   = 6;
+const BUNKER_ROWS_G = 4;  // grid rows per bunker (avoid name clash with ENEMY_ROWS)
+const BUNKER_W      = 80;
+const BUNKER_H      = 50;
+const BUNKER_COUNT  = 4;
+
+function buildBunkers() {
+  bunkers = [];
+  const totalBunkerW = BUNKER_COUNT * BUNKER_W;
+  const spacing      = (canvas.width - totalBunkerW) / (BUNKER_COUNT + 1);
+  const bunkerY      = canvas.height * 0.72;
+
+  for (let b = 0; b < BUNKER_COUNT; b++) {
+    const bx     = spacing + b * (BUNKER_W + spacing);
+    const chunks = [];
+    for (let row = 0; row < BUNKER_ROWS_G; row++) {
+      for (let col = 0; col < BUNKER_COLS; col++) {
+        chunks.push({ alive: true, row, col });
+      }
+    }
+    bunkers.push({
+      x:         bx,
+      y:         bunkerY,
+      w:         BUNKER_W,
+      h:         BUNKER_H,
+      maxHealth: BUNKER_COLS * BUNKER_ROWS_G,
+      chunks,
+    });
+  }
+}
+
+/** Return the health-stage color for a bunker based on % alive chunks */
+function bunkerColor(bunker) {
+  const alive = bunker.chunks.filter(c => c.alive).length;
+  const pct   = alive / bunker.maxHealth;
+  if (pct > 0.75) return '#00cc44';
+  if (pct > 0.50) return '#88cc00';
+  if (pct > 0.25) return '#cc6600';
+  return '#882200';
+}
+
+/** Hit a bunker at world coords (bx, by). Returns true if a chunk was hit. */
+function hitBunker(bunker, bx, by) {
+  const chunkW = bunker.w / BUNKER_COLS;
+  const chunkH = bunker.h / BUNKER_ROWS_G;
+  const col    = Math.floor((bx - bunker.x) / chunkW);
+  const row    = Math.floor((by - bunker.y) / chunkH);
+  if (col < 0 || col >= BUNKER_COLS || row < 0 || row >= BUNKER_ROWS_G) return false;
+
+  const idx = row * BUNKER_COLS + col;
+  if (!bunker.chunks[idx].alive) return false;
+
+  // Kill the hit chunk
+  bunker.chunks[idx].alive = false;
+
+  // Kill 1-2 random neighbours for natural crumbling
+  const neighbours = [];
+  const dirs = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
+  for (const [dr, dc] of dirs) {
+    const nr = row + dr;
+    const nc = col + dc;
+    if (nr >= 0 && nr < BUNKER_ROWS_G && nc >= 0 && nc < BUNKER_COLS) {
+      const ni = nr * BUNKER_COLS + nc;
+      if (bunker.chunks[ni].alive) neighbours.push(ni);
+    }
+  }
+  const killCount = 1 + Math.floor(Math.random() * 2); // 1 or 2
+  for (let k = 0; k < killCount && neighbours.length > 0; k++) {
+    const pick = Math.floor(Math.random() * neighbours.length);
+    bunker.chunks[neighbours[pick]].alive = false;
+    neighbours.splice(pick, 1);
+  }
+
+  return true;
+}
+
+function drawBunkers() {
+  const chunkW = BUNKER_W / BUNKER_COLS;
+  const chunkH = BUNKER_H / BUNKER_ROWS_G;
+
+  for (const bunker of bunkers) {
+    const color = bunkerColor(bunker);
+    for (const chunk of bunker.chunks) {
+      if (!chunk.alive) continue;
+      const cx = bunker.x + chunk.col * chunkW;
+      const cy = bunker.y + chunk.row * chunkH;
+      ctx.fillStyle = color;
+      ctx.fillRect(cx, cy, chunkW, chunkH);
+      // Subtle darker border
+      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+      ctx.lineWidth   = 1;
+      ctx.strokeRect(cx, cy, chunkW, chunkH);
+    }
+  }
 }
 
 // ── Particles ────────────────────────────────────────────────
@@ -686,12 +811,14 @@ function initGame() {
   bullets      = [];
   enemyBullets = [];
   particles    = [];
+  bunkers      = [];
 
   player.x = canvas.width  / 2;
   player.y = canvas.height - 80;
 
   buildStars();
   buildEnemies();
+  buildBunkers();
 
   invincible      = false;
   invincibleUntil = 0;
@@ -717,6 +844,86 @@ function initGame() {
 
   showWaveMessage(`WAVE ${wave}`);
   updateHUD();
+}
+
+// ── Enemy shot spawner ───────────────────────────────────────
+function spawnEnemyShot(shooter) {
+  const sx = shooter.x + shooter.w / 2;
+  const sy = shooter.y + shooter.h;
+
+  if (shooter.row === 0) {
+    // Commander: spread shot — 3 bullets in a fan
+    const angles = [0, -Math.PI / 9, Math.PI / 9]; // 0°, -20°, +20°
+    for (const angle of angles) {
+      enemyBullets.push({
+        x:     sx,
+        y:     sy,
+        w:     8,
+        h:     12,
+        vx:    Math.sin(angle) * ENEMY_BULLET_SPEED,
+        vy:    Math.cos(angle) * ENEMY_BULLET_SPEED,
+        color: '#ff6600',
+      });
+    }
+    // Slightly higher-pitched sound for Commander
+    try {
+      const ac   = getAudioCtx();
+      const osc  = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.connect(gain);
+      gain.connect(ac.destination);
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(330, ac.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(165, ac.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.12, ac.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.14);
+      osc.start(ac.currentTime);
+      osc.stop(ac.currentTime + 0.14);
+    } catch (_) {}
+
+  } else if (shooter.row === 1) {
+    // Soldier: aimed shot toward player
+    const dx    = player.x - sx;
+    const dy    = player.y - sy;
+    const angle = Math.atan2(dy, dx);
+    enemyBullets.push({
+      x:     sx,
+      y:     sy,
+      w:     4,
+      h:     18,
+      vx:    Math.cos(angle) * ENEMY_BULLET_SPEED,
+      vy:    Math.sin(angle) * ENEMY_BULLET_SPEED,
+      color: '#ffdd00',
+    });
+    playEnemyShootSound();
+
+  } else {
+    // Drone (rows 2-3): standard straight shot
+    enemyBullets.push({
+      x:     sx,
+      y:     sy,
+      w:     6,
+      h:     14,
+      vx:    0,
+      vy:    ENEMY_BULLET_SPEED,
+      color: '#ff3333',
+    });
+    // Slightly lower-pitched sound for Drone
+    try {
+      const ac   = getAudioCtx();
+      const osc  = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.connect(gain);
+      gain.connect(ac.destination);
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(140, ac.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(70, ac.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.12, ac.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.14);
+      osc.start(ac.currentTime);
+      osc.stop(ac.currentTime + 0.14);
+    } catch (_) {}
+  }
 }
 
 // ── Main game loop ───────────────────────────────────────────
@@ -801,28 +1008,54 @@ function update(timestamp) {
   const shootCandidates = enemies.filter(e => e.alive);
   if (timestamp - lastEnemyShot > shootInterval && shootCandidates.length > 0) {
     const shooter = shootCandidates[Math.floor(Math.random() * shootCandidates.length)];
-    enemyBullets.push({
-      x: shooter.x + shooter.w / 2,
-      y: shooter.y + shooter.h,
-      w: 6,
-      h: 14,
-    });
+    spawnEnemyShot(shooter);
     lastEnemyShot = timestamp;
-    playEnemyShootSound();
   }
 
   // ── Move enemy bullets
   for (let i = enemyBullets.length - 1; i >= 0; i--) {
     const b = enemyBullets[i];
-    if (b.vx !== undefined) {
-      b.x += b.vx;
-      b.y += b.vy;
-    } else {
-      b.y += ENEMY_BULLET_SPEED;
-    }
+    b.x += (b.vx || 0);
+    b.y += (b.vy || ENEMY_BULLET_SPEED);
     if (b.y > canvas.height + 20 || b.x < -20 || b.x > canvas.width + 20) {
       enemyBullets.splice(i, 1);
     }
+  }
+
+  // ── Collision: player bullets vs bunkers
+  for (let bi = bullets.length - 1; bi >= 0; bi--) {
+    const b = bullets[bi];
+    let hit = false;
+    for (const bunker of bunkers) {
+      if (b.x >= bunker.x && b.x <= bunker.x + bunker.w &&
+          b.y >= bunker.y && b.y <= bunker.y + bunker.h) {
+        if (hitBunker(bunker, b.x, b.y)) {
+          bullets.splice(bi, 1);
+          playBunkerHitSound();
+          hit = true;
+          break;
+        }
+      }
+    }
+    if (hit) continue;
+  }
+
+  // ── Collision: enemy bullets vs bunkers
+  for (let bi = enemyBullets.length - 1; bi >= 0; bi--) {
+    const b = enemyBullets[bi];
+    let hit = false;
+    for (const bunker of bunkers) {
+      if (b.x >= bunker.x && b.x <= bunker.x + bunker.w &&
+          b.y >= bunker.y && b.y <= bunker.y + bunker.h) {
+        if (hitBunker(bunker, b.x, b.y)) {
+          enemyBullets.splice(bi, 1);
+          playBunkerHitSound();
+          hit = true;
+          break;
+        }
+      }
+    }
+    if (hit) continue;
   }
 
   // ── Collision: player bullets vs enemies
@@ -973,6 +1206,7 @@ function update(timestamp) {
     divingEnemies = [];
     diveTimer    = Date.now() + 8000 + Math.random() * 4000;
     buildEnemies();
+    buildBunkers();
     showWaveMessage(`WAVE ${wave}`);
   }
 
@@ -1140,6 +1374,9 @@ function render() {
   // Stars
   drawStars();
 
+  // Bunkers (after stars, before enemies)
+  drawBunkers();
+
   // Mystery ship (above stars, below enemies)
   if (mysteryShip) {
     drawMysteryShip(mysteryShip);
@@ -1188,9 +1425,9 @@ function render() {
   }
   ctx.shadowBlur = 0;
 
-  // Enemy bullets (red ovals)
-  ctx.fillStyle = '#ff3333';
+  // Enemy bullets (colored ovals based on type)
   for (const b of enemyBullets) {
+    ctx.fillStyle = b.color || '#ff3333';
     ctx.beginPath();
     ctx.ellipse(b.x, b.y + b.h / 2, b.w / 2, b.h / 2, 0, 0, Math.PI * 2);
     ctx.fill();
