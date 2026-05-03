@@ -45,7 +45,6 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0;
   opacity: 0;
   animation: splashFadeIn 0.8s ease-out 0.3s forwards,
              splashFadeOut 0.6s ease-in 2.8s forwards;
@@ -55,27 +54,19 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
 }
 
-#splash-icon {
-  font-size: 4rem;
-  filter: drop-shadow(0 0 24px rgba(240,192,64,0.6));
-  animation: splashIconPulse 1.5s ease-in-out infinite;
-}
-
-#splash-studio {
-  font-size: 1.6rem;
-  font-weight: 900;
-  letter-spacing: 6px;
-  text-transform: uppercase;
-  color: #f0c040;
-  text-shadow: 0 0 30px #f0c04088, 0 0 60px #f0c04033;
+#splash-logo-img {
+  width: clamp(260px, 38vw, 520px);
+  filter: drop-shadow(0 0 28px rgba(240,192,64,0.55))
+          drop-shadow(0 0 60px rgba(240,192,64,0.25));
+  animation: splashLogoPulse 2s ease-in-out infinite;
 }
 
 #splash-tagline {
-  font-size: 0.85rem;
-  letter-spacing: 5px;
+  font-size: 0.9rem;
+  letter-spacing: 6px;
   color: #666;
   text-transform: lowercase;
   font-style: italic;
@@ -89,9 +80,11 @@ body {
   from { opacity: 1; transform: scale(1); }
   to   { opacity: 0; transform: scale(1.04); }
 }
-@keyframes splashIconPulse {
-  0%, 100% { transform: scale(1);    filter: drop-shadow(0 0 20px rgba(240,192,64,0.5)); }
-  50%       { transform: scale(1.08); filter: drop-shadow(0 0 40px rgba(240,192,64,0.9)); }
+@keyframes splashLogoPulse {
+  0%, 100% { filter: drop-shadow(0 0 20px rgba(240,192,64,0.45))
+                     drop-shadow(0 0 50px rgba(240,192,64,0.20)); }
+  50%       { filter: drop-shadow(0 0 36px rgba(240,192,64,0.80))
+                     drop-shadow(0 0 80px rgba(240,192,64,0.40)); }
 }
 
 /* ─────────────────────────────────────────────
@@ -99,19 +92,16 @@ body {
 ───────────────────────────────────────────── */
 #menu-screen {
   background: radial-gradient(ellipse at center, #0d0d2e 0%, #0a0a0a 100%);
-  gap: 18px;
+  gap: 16px;
   position: relative;
 }
 
-/* Studio badge above the game title */
-#menu-studio-badge {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 5px;
-  text-transform: uppercase;
-  color: #f0c040;
-  opacity: 0.75;
-  margin-bottom: -10px;
+/* Logo above the game title */
+#menu-logo {
+  width: clamp(160px, 22vw, 300px);
+  opacity: 0.90;
+  filter: drop-shadow(0 0 12px rgba(240,192,64,0.35));
+  margin-bottom: -4px;
 }
 
 #menu-screen h1 {
@@ -310,12 +300,11 @@ body {
   font-weight: bold;
 }
 
-/* Studio credit inside game-over / win modal */
-.modal-studio-credit {
-  font-size: 0.65rem;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  color: #444;
+/* Logo inside modals (pause, game over) */
+.modal-logo {
+  width: clamp(100px, 14vw, 180px);
+  opacity: 0.55;
+  filter: drop-shadow(0 0 8px rgba(240,192,64,0.2));
   margin-top: -8px;
 }
 

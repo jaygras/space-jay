@@ -13,8 +13,7 @@
   <div id="splash-screen" class="screen active">
     <div id="splash-content">
       <div id="splash-logo">
-        <div id="splash-icon">🎮</div>
-        <div id="splash-studio">DON'T SAY GAME STUDIOS</div>
+        <img src="LOGO.png" alt="Don't Say Game Studios" id="splash-logo-img" />
         <div id="splash-tagline">presents</div>
       </div>
     </div>
@@ -22,7 +21,7 @@
 
   <!-- MENU SCREEN -->
   <div id="menu-screen" class="screen">
-    <div id="menu-studio-badge">DON'T SAY GAME STUDIOS</div>
+    <img src="LOGO.png" alt="Don't Say Game Studios" id="menu-logo" />
     <h1>🚀 SPACE JAY</h1>
     <p class="subtitle">Defend the galaxy. Shoot everything.</p>
     <div class="menu-options">
@@ -73,6 +72,7 @@
       <button class="btn-primary" id="resume-btn">Resume</button>
       <button class="btn-secondary" id="pause-menu-btn">Main Menu</button>
       <button class="btn-quit" id="pause-quit-btn">Quit Game</button>
+      <img src="LOGO.png" alt="Don't Say Game Studios" class="modal-logo" />
     </div>
   </div>
 
@@ -95,11 +95,11 @@
       <button class="btn-primary" id="play-again-btn">Play Again</button>
       <button class="btn-secondary" id="finish-menu-btn">Main Menu</button>
       <button class="btn-quit" id="finish-quit-btn">Quit Game</button>
-      <div class="modal-studio-credit">Don't Say Game Studios</div>
+      <img src="LOGO.png" alt="Don't Say Game Studios" class="modal-logo" />
     </div>
   </div>
 
-  <script src="game.js?v=10"></script>
+  <script src="game.js?v=11"></script>
 
   <!-- QUIT OVERLAY – shown when window.close() is blocked -->
   <div id="quit-overlay" style="
@@ -107,19 +107,25 @@
       background:rgba(0,0,0,0.95);
       flex-direction:column; align-items:center; justify-content:center;
       gap:20px; font-family:'Segoe UI',Arial,sans-serif; color:#fff;">
-    <div style="font-size:0.75rem;letter-spacing:4px;color:#555;text-transform:uppercase;">Don't Say Game Studios</div>
-    <div style="font-size:2rem;letter-spacing:4px;color:#f0c040;text-shadow:0 0 20px #f0c04066;">🚀 SPACE JAY</div>
-    <div style="font-size:1rem;color:#aaa;letter-spacing:1px;">Press <kbd style="background:#222;border:1px solid #555;border-radius:6px;padding:4px 12px;color:#fff;font-size:1rem;">Alt + F4</kbd> to close</div>
+    <img src="LOGO.png" alt="Don't Say Game Studios"
+         style="width:220px; opacity:0.85; margin-bottom:4px;" />
+    <div style="font-size:2rem;letter-spacing:4px;color:#f0c040;
+                text-shadow:0 0 20px #f0c04066;">🚀 SPACE JAY</div>
+    <div style="font-size:1rem;color:#aaa;letter-spacing:1px;">Press
+      <kbd style="background:#222;border:1px solid #555;border-radius:6px;
+                  padding:4px 12px;color:#fff;font-size:1rem;">Alt + F4</kbd>
+      to close</div>
     <button onclick="window.close()" style="
         background:#cc3333;color:#fff;border:none;
         padding:12px 40px;font-size:1rem;font-weight:bold;
-        letter-spacing:3px;border-radius:8px;cursor:pointer;text-transform:uppercase;">
+        letter-spacing:3px;border-radius:8px;cursor:pointer;
+        text-transform:uppercase;">
       Close Game
     </button>
-    <button onclick="document.getElementById('quit-overlay').style.display='none'" style="
-        background:transparent;color:#aaa;border:1px solid #555;
-        padding:10px 30px;font-size:0.9rem;letter-spacing:2px;
-        border-radius:8px;cursor:pointer;text-transform:uppercase;">
+    <button onclick="document.getElementById('quit-overlay').style.display='none'"
+        style="background:transparent;color:#aaa;border:1px solid #555;
+               padding:10px 30px;font-size:0.9rem;letter-spacing:2px;
+               border-radius:8px;cursor:pointer;text-transform:uppercase;">
       Cancel
     </button>
   </div>
