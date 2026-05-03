@@ -6,6 +6,22 @@ __pycache__/
 # Chrome kiosk temp profile (created at runtime)
 chrome-profile/
 
+# Audio production temp files
+whisper_raw.wav
+whisper_trimmed.wav
+whisper_test.wav
+record_whisper.py
+record_whisper.bat
+trim_and_mix.py
+whisper_editor.py
+diagnose_rate.py
+extract_whisper.py
+fix_rate.py
+check_devices.py
+gen_jingle.py
+gen_jingle2.py
+gen_jingle3.py
+
 # OS
 .DS_Store
 Thumbs.db

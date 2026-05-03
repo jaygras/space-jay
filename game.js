@@ -2107,11 +2107,33 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialise hi-score display on menu
   document.getElementById('hud-hi') && (document.getElementById('hud-hi').textContent = hiScore);
 
-  // ── Splash screen — auto-advance to menu after animation (3.6s total)
-  setTimeout(() => {
-    showScreen('menu-screen');
-    loadLeaderboard();
-  }, 3500);
+  // ── Splash screen — wait for click, play jingle, then advance to menu
+  const splashScreen = document.getElementById('splash-screen');
+  const jingle       = document.getElementById('splash-jingle');
+
+  function startFromSplash() {
+    splashScreen.removeEventListener('click', startFromSplash);
+
+    // Play jingle (user gesture unlocks audio)
+    if (jingle) {
+      jingle.play().catch(() => {});
+    }
+
+    // Fade out splash content
+    const content = document.getElementById('splash-content');
+    if (content) {
+      content.style.transition = 'opacity 0.6s ease';
+      content.style.opacity    = '0';
+    }
+
+    // Advance to menu after jingle duration (3.0s) minus fade time
+    setTimeout(() => {
+      showScreen('menu-screen');
+      loadLeaderboard();
+    }, 3000);
+  }
+
+  splashScreen.addEventListener('click', startFromSplash);
 
   // Start button
   document.getElementById('start-btn').addEventListener('click', () => {
