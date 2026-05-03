@@ -318,3 +318,108 @@ body {
   color: #444;
   margin-top: -8px;
 }
+
+/* ─────────────────────────────────────────────
+   LEADERBOARD (menu screen)
+───────────────────────────────────────────── */
+#leaderboard {
+  background: rgba(0,0,0,0.55);
+  border: 1px solid #2a2a4a;
+  border-radius: 12px;
+  padding: 14px 28px;
+  min-width: 300px;
+  max-width: 380px;
+  width: 100%;
+}
+
+#lb-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #f0c040;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+#lb-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lb-loading {
+  text-align: center;
+  color: #555;
+  font-size: 0.8rem;
+  letter-spacing: 2px;
+  padding: 8px 0;
+}
+
+.lb-row {
+  display: grid;
+  grid-template-columns: 24px 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.8rem;
+  padding: 3px 4px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.lb-row:hover { background: rgba(255,255,255,0.04); }
+.lb-row.lb-top { color: #f0c040; }
+.lb-row.lb-mine { background: rgba(240,192,64,0.08); color: #fff; }
+
+.lb-rank  { color: #555; font-size: 0.7rem; text-align: right; }
+.lb-name  { color: #ccc; letter-spacing: 1px; overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap; }
+.lb-score { color: #f0c040; font-weight: bold; text-align: right; }
+.lb-wave  { color: #555; font-size: 0.7rem; text-align: right; }
+
+.lb-row.lb-top .lb-rank  { color: #f0c040; }
+.lb-row.lb-top .lb-name  { color: #fff; }
+
+/* ── Name entry in game-over modal ── */
+#finish-rank {
+  font-size: 0.85rem;
+  color: #aaa;
+  letter-spacing: 2px;
+  text-align: center;
+  min-height: 1.2em;
+}
+#finish-rank .highlight { color: #f0c040; font-weight: bold; }
+
+#name-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+#name-entry-label {
+  font-size: 0.85rem;
+  color: #ccc;
+  letter-spacing: 1px;
+  text-align: center;
+}
+#player-name {
+  background: #1a1a2e;
+  border: 1px solid #444;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 1rem;
+  letter-spacing: 3px;
+  padding: 8px 16px;
+  text-align: center;
+  width: 220px;
+  outline: none;
+  text-transform: uppercase;
+  transition: border-color 0.2s;
+}
+#player-name:focus { border-color: #f0c040; }
+#score-submitted {
+  font-size: 0.85rem;
+  color: #44cc88;
+  letter-spacing: 2px;
+}
+

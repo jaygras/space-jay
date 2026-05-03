@@ -201,7 +201,85 @@ function playHitSound() {
   } catch (_) {}
 }
 
-// ── Star field ───────────────────────────────────────────────
+// ── Supabase leaderboard ─────────────────────────────────────
+const SUPABASE_URL = 'https://waqephjzfgdtfmugbobo.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhcWVwaGp6ZmdkdGZtdWdib2JvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4MzM4NjIsImV4cCI6MjA5MzQwOTg2Mn0.1or5dsYAEgMjSnfGA0oWRgzhKkhLC5bK-Ygkl8lGiZA';
+const LB_TABLE    = 'high_scores';
+const LB_LIMIT    = 10;
+
+// Cached last-submitted player name
+let playerName = localStorage.getItem('space-jay-name') || '';
+
+async function lbFetch(path, options = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: {
+      'apikey':        SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type':  'application/json',
+      'Prefer':        'return=representation',
+      ...options.headers,
+    },
+    ...options,
+  });
+  if (!res.ok) throw new Error(`Supabase ${res.status}`);
+  return res.json();
+}
+
+/** Fetch top-10 scores and render into the menu leaderboard panel */
+async function loadLeaderboard() {
+  const listEl = document.getElementById('lb-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<div class="lb-loading">Loading…</div>';
+  try {
+    const rows = await lbFetch(
+      `${LB_TABLE}?select=player,score,wave&order=score.desc&limit=${LB_LIMIT}`
+    );
+    if (!rows.length) {
+      listEl.innerHTML = '<div class="lb-loading">No scores yet — be the first!</div>';
+      return;
+    }
+    listEl.innerHTML = rows.map((r, i) => {
+      const isTop  = i < 3;
+      const isMine = r.player.toUpperCase() === playerName.toUpperCase() && playerName;
+      const medal  = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+      return `<div class="lb-row${isTop ? ' lb-top' : ''}${isMine ? ' lb-mine' : ''}">
+        <span class="lb-rank">${medal}</span>
+        <span class="lb-name">${escapeHtml(r.player)}</span>
+        <span class="lb-score">${r.score.toLocaleString()}</span>
+        <span class="lb-wave">W${r.wave}</span>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    listEl.innerHTML = '<div class="lb-loading">Scores unavailable</div>';
+  }
+}
+
+/** Submit a score to Supabase */
+async function submitScore(name, scoreVal, waveVal) {
+  await lbFetch(LB_TABLE, {
+    method: 'POST',
+    body: JSON.stringify({ player: name.trim().toUpperCase(), score: scoreVal, wave: waveVal }),
+  });
+}
+
+/** Check if a score qualifies for the top-10 leaderboard */
+async function checkQualifies(scoreVal) {
+  try {
+    const rows = await lbFetch(
+      `${LB_TABLE}?select=score&order=score.desc&limit=${LB_LIMIT}`
+    );
+    if (rows.length < LB_LIMIT) return true;          // board not full yet
+    return scoreVal > rows[rows.length - 1].score;    // beats the lowest score
+  } catch (_) {
+    return true; // if we can't check, allow submission
+  }
+}
+
+function escapeHtml(str) {
+  return str.replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])
+  );
+}
 function buildStars() {
   stars = [];
   for (let i = 0; i < 120; i++) {
@@ -328,11 +406,11 @@ function showScreen(id) {
   if (el) el.classList.add('active');
 }
 
-function showGameOver(won) {
+async function showGameOver(won) {
   cancelAnimationFrame(animFrameId);
   gameRunning = false;
 
-  showCursorBriefly();   // restore cursor on game over screen
+  showCursorBriefly();
   clearTimeout(cursorHideTimer);
 
   if (score > hiScore) {
@@ -342,11 +420,40 @@ function showGameOver(won) {
 
   document.getElementById('finish-title').textContent = won ? '🎉 YOU WIN!' : 'GAME OVER';
   document.getElementById('finish-stats').innerHTML =
-    `Score: <span class="highlight">${score}</span><br>` +
+    `Score: <span class="highlight">${score.toLocaleString()}</span><br>` +
     `Wave Reached: <span class="highlight">${wave}</span><br>` +
-    `Hi-Score: <span class="highlight">${hiScore}</span>`;
+    `Hi-Score: <span class="highlight">${hiScore.toLocaleString()}</span>`;
+
+  // Reset submission UI
+  document.getElementById('name-entry').style.display    = 'none';
+  document.getElementById('score-submitted').style.display = 'none';
+  document.getElementById('finish-rank').textContent     = '';
 
   showScreen('finish-screen');
+
+  // Check if score qualifies for global leaderboard
+  if (score > 0) {
+    try {
+      const qualifies = await checkQualifies(score);
+      if (qualifies) {
+        const nameEl = document.getElementById('player-name');
+        nameEl.value = playerName;
+        document.getElementById('name-entry-label').textContent =
+          won ? '🏆 You cleared all waves! Enter your name:'
+              : '🏆 You made the leaderboard! Enter your name:';
+        document.getElementById('name-entry').style.display = 'flex';
+        nameEl.focus();
+      } else {
+        // Show their rank even if not top-10
+        const rows = await lbFetch(
+          `${LB_TABLE}?select=score&order=score.desc`
+        );
+        const rank = rows.filter(r => r.score > score).length + 1;
+        document.getElementById('finish-rank').innerHTML =
+          `Global rank: <span class="highlight">#${rank}</span>`;
+      }
+    } catch (_) {}
+  }
 }
 
 function quitGame() {
@@ -1153,9 +1260,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('hud-hi') && (document.getElementById('hud-hi').textContent = hiScore);
 
   // ── Splash screen — auto-advance to menu after animation (3.6s total)
-  // CSS: fade-in at 0.3s, fade-out starts at 2.8s, ends at 3.4s
   setTimeout(() => {
     showScreen('menu-screen');
+    loadLeaderboard();
   }, 3500);
 
   // Start button
@@ -1177,10 +1284,38 @@ document.addEventListener('DOMContentLoaded', () => {
     gameRunning = false;
     gamePaused  = false;
     showScreen('menu-screen');
+    loadLeaderboard();
   });
 
   // Pause → Quit
   document.getElementById('pause-quit-btn').addEventListener('click', quitGame);
+
+  // Submit score
+  document.getElementById('submit-score-btn').addEventListener('click', async () => {
+    const nameEl = document.getElementById('player-name');
+    const name   = nameEl.value.trim();
+    if (!name) { nameEl.focus(); return; }
+
+    playerName = name;
+    localStorage.setItem('space-jay-name', name);
+
+    document.getElementById('submit-score-btn').disabled    = true;
+    document.getElementById('submit-score-btn').textContent = 'SUBMITTING…';
+
+    try {
+      await submitScore(name, score, wave);
+      document.getElementById('name-entry').style.display      = 'none';
+      document.getElementById('score-submitted').style.display = 'block';
+    } catch (_) {
+      document.getElementById('submit-score-btn').textContent = 'RETRY';
+      document.getElementById('submit-score-btn').disabled    = false;
+    }
+  });
+
+  // Enter key submits name
+  document.getElementById('player-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('submit-score-btn').click();
+  });
 
   // Play Again
   document.getElementById('play-again-btn').addEventListener('click', () => {
@@ -1190,6 +1325,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Finish → Main Menu
   document.getElementById('finish-menu-btn').addEventListener('click', () => {
     showScreen('menu-screen');
+    loadLeaderboard();
   });
 
   // Finish → Quit

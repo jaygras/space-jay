@@ -36,6 +36,13 @@
     </div>
     <button id="start-btn" class="btn-primary">START GAME</button>
     <button class="btn-quit" id="menu-quit-btn" style="margin-top:4px;">Quit Game</button>
+
+    <!-- Global leaderboard panel -->
+    <div id="leaderboard">
+      <div id="lb-title">🏆 TOP SCORES</div>
+      <div id="lb-list"><div class="lb-loading">Loading scores…</div></div>
+    </div>
+
     <div id="menu-copyright">© Don't Say Game Studios</div>
   </div>
 
@@ -74,6 +81,17 @@
     <div class="modal">
       <h2 id="finish-title">GAME OVER</h2>
       <div id="finish-stats"></div>
+      <div id="finish-rank"></div>
+
+      <!-- Name entry — shown when score qualifies for leaderboard -->
+      <div id="name-entry" style="display:none;">
+        <p id="name-entry-label">🏆 You made the leaderboard! Enter your name:</p>
+        <input id="player-name" type="text" maxlength="16"
+               placeholder="Your name" autocomplete="off" spellcheck="false" />
+        <button class="btn-primary" id="submit-score-btn">SUBMIT</button>
+      </div>
+      <div id="score-submitted" style="display:none;">✅ Score submitted!</div>
+
       <button class="btn-primary" id="play-again-btn">Play Again</button>
       <button class="btn-secondary" id="finish-menu-btn">Main Menu</button>
       <button class="btn-quit" id="finish-quit-btn">Quit Game</button>
@@ -81,7 +99,7 @@
     </div>
   </div>
 
-  <script src="game.js?v=6"></script>
+  <script src="game.js?v=7"></script>
 
   <!-- QUIT OVERLAY – shown when window.close() is blocked -->
   <div id="quit-overlay" style="
