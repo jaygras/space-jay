@@ -1194,22 +1194,6 @@ function update(timestamp) {
     }
   }
 
-  // ── Wave clear (re-check after bullet collisions may have killed enemies)
-  if (enemies.filter(e => e.alive).length === 0 && divingEnemies.length === 0) {
-    playWaveClearSound();
-    wave++;
-    const cfg = DIFFICULTY[difficulty] || DIFFICULTY.medium;
-    enemySpeed    = cfg.enemySpeed * Math.pow(cfg.speedMult, wave - 1);
-    shootInterval = Math.max(400, cfg.shootInterval * Math.pow(0.88, wave - 1));
-    bullets      = [];
-    enemyBullets = [];
-    divingEnemies = [];
-    diveTimer    = Date.now() + 8000 + Math.random() * 4000;
-    buildEnemies();
-    buildBunkers();
-    showWaveMessage(`WAVE ${wave}`);
-  }
-
   // ── Diving enemies
   if (wave >= 2 && divingEnemies.length < 2 && Date.now() >= diveTimer) {
     // Pick a random alive enemy from row 0, fallback to row 1
@@ -1270,10 +1254,43 @@ function update(timestamp) {
       playEnemyShootSound();
     }
 
-    // Remove when off-screen
+    // When off-screen bottom: respawn at top if it's the last enemy alive,
+    // otherwise just remove it (wave-clear check will fire next frame)
     if (de.y > canvas.height + 80) {
-      divingEnemies.splice(di, 1);
+      const aliveInGrid = enemies.filter(e => e.alive).length;
+      const isLast      = aliveInGrid === 0 && divingEnemies.length === 1;
+
+      if (isLast) {
+        // Respawn at top — reset dive arc from a new position above screen
+        de.t       = 0;
+        de.baseX   = 80 + Math.random() * (canvas.width - 160);
+        de.baseY   = -40;
+        de.hasFired  = false;
+        de.shotsFired = 0;
+        de.x       = de.baseX;
+        de.y       = de.baseY;
+        // Show a brief "LAST ENEMY!" message
+        showWaveMessage('LAST ENEMY!', 1500);
+      } else {
+        divingEnemies.splice(di, 1);
+      }
     }
+  }
+
+  // ── Wave clear — checked AFTER dive loop so last diving enemy removal is caught
+  if (enemies.filter(e => e.alive).length === 0 && divingEnemies.length === 0) {
+    playWaveClearSound();
+    wave++;
+    const cfg = DIFFICULTY[difficulty] || DIFFICULTY.medium;
+    enemySpeed    = cfg.enemySpeed * Math.pow(cfg.speedMult, wave - 1);
+    shootInterval = Math.max(400, cfg.shootInterval * Math.pow(0.88, wave - 1));
+    bullets       = [];
+    enemyBullets  = [];
+    divingEnemies = [];
+    diveTimer     = Date.now() + 8000 + Math.random() * 4000;
+    buildEnemies();
+    buildBunkers();
+    showWaveMessage(`WAVE ${wave}`);
   }
 
   // ── Power-ups: move and collect
