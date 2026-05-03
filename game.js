@@ -24,6 +24,33 @@ const MAX_LIVES = 3;
 // Points per row (row 0 = top)
 const POINTS = [30, 20, 10, 10];
 
+// Diving enemy bonus multiplier
+const DIVE_BONUS = 2;
+
+// Power-up types
+const POWERUP_TYPES = ['rapidfire', 'doubleshot', 'shield', 'bomb', 'scoremult'];
+const POWERUP_COLORS = {
+  rapidfire:  '#00ffff',
+  doubleshot: '#ffff00',
+  shield:     '#00ff88',
+  bomb:       '#ff4444',
+  scoremult:  '#ffd700',
+};
+const POWERUP_ICONS = {
+  rapidfire:  '⚡',
+  doubleshot: '✦',
+  shield:     '🛡',
+  bomb:       '💥',
+  scoremult:  '★',
+};
+const POWERUP_DURATION = {
+  rapidfire:  8000,
+  doubleshot: 8000,
+  shield:     0,      // no timer — absorbs one hit
+  bomb:       0,      // instant
+  scoremult:  10000,
+};
+
 // Score multiplier per difficulty
 const SCORE_MULTIPLIER = { easy: 1, medium: 2, hard: 3 };
 
@@ -77,6 +104,25 @@ let waveMsgTime = 0;
 
 // Animation frame counter for enemy flap cycles
 let animFrame = 0;
+
+// ── Diving enemies ───────────────────────────────────────────
+let divingEnemies = [];   // enemies currently diving
+let diveTimer     = 0;    // timestamp for next dive trigger
+let diveInterval  = 0;    // random 8-12s interval
+
+// ── Power-ups ────────────────────────────────────────────────
+let powerUps      = [];   // { x, y, type, life } falling power-ups
+let activePowerUps = {};  // { type: expiryTimestamp } for timed ones; 'shield'/'bomb' are instant
+
+// ── Mystery ship ─────────────────────────────────────────────
+let mysteryShip  = null;  // { x, y, dir, lightFrame } or null
+let mysteryTimer = 0;     // timestamp for next mystery ship spawn
+let mysteryDir   = 1;     // 1 = left-to-right, -1 = right-to-left (alternates)
+let mysteryOsc   = null;  // Web Audio oscillator for warble tone
+let mysteryOscGain = null;
+
+// ── Floating score texts ─────────────────────────────────────
+let floatingTexts = [];   // { x, y, text, life, decay }
 
 // Invincibility after being hit
 let invincible      = false;
@@ -260,6 +306,90 @@ function playHitSound() {
     subOsc.start(t);
     subOsc.stop(t + 0.25);
 
+  } catch (_) {}
+}
+
+/** Short ascending chime when power-up collected (3 quick beeps) */
+function playPowerUpSound() {
+  try {
+    const ac    = getAudioCtx();
+    const notes = [660, 880, 1100];
+    notes.forEach((freq, i) => {
+      const osc  = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.connect(gain);
+      gain.connect(ac.destination);
+      osc.type = 'sine';
+      const t = ac.currentTime + i * 0.07;
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.20, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
+      osc.start(t);
+      osc.stop(t + 0.12);
+    });
+  } catch (_) {}
+}
+
+/** Start continuous warbling tone for mystery ship */
+function startMysterySound() {
+  try {
+    const ac  = getAudioCtx();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain);
+    gain.connect(ac.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(440, ac.currentTime);
+    gain.gain.setValueAtTime(0.10, ac.currentTime);
+    osc.start(ac.currentTime);
+    mysteryOsc     = osc;
+    mysteryOscGain = gain;
+  } catch (_) {}
+}
+
+/** Stop mystery ship warble */
+function stopMysterySound() {
+  try {
+    if (mysteryOscGain) {
+      mysteryOscGain.gain.exponentialRampToValueAtTime(0.001, getAudioCtx().currentTime + 0.1);
+    }
+    if (mysteryOsc) {
+      mysteryOsc.stop(getAudioCtx().currentTime + 0.12);
+      mysteryOsc     = null;
+      mysteryOscGain = null;
+    }
+  } catch (_) {}
+}
+
+/** Descending whistle + explosion for mystery ship hit */
+function playMysteryHitSound() {
+  try {
+    const ac = getAudioCtx();
+    const t  = ac.currentTime;
+    const osc  = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain);
+    gain.connect(ac.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1200, t);
+    osc.frequency.exponentialRampToValueAtTime(200, t + 0.35);
+    gain.gain.setValueAtTime(0.25, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+    osc.start(t);
+    osc.stop(t + 0.4);
+    // noise burst
+    const bufLen = Math.floor(ac.sampleRate * 0.3);
+    const buf    = ac.createBuffer(1, bufLen, ac.sampleRate);
+    const data   = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+    const src  = ac.createBufferSource();
+    src.buffer = buf;
+    const ng   = ac.createGain();
+    src.connect(ng);
+    ng.connect(ac.destination);
+    ng.gain.setValueAtTime(0.3, t);
+    ng.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    src.start(t);
   } catch (_) {}
 }
 
@@ -573,6 +703,18 @@ function initGame() {
   lastBulletTime  = 0;
   lastEnemyShot   = 0;
 
+  // New feature state
+  divingEnemies  = [];
+  diveTimer      = Date.now() + 8000 + Math.random() * 4000;
+  diveInterval   = 8000 + Math.random() * 4000;
+  powerUps       = [];
+  activePowerUps = {};
+  mysteryShip    = null;
+  mysteryTimer   = Date.now() + 30000 + Math.random() * 15000;
+  mysteryDir     = 1;
+  floatingTexts  = [];
+  stopMysterySound();
+
   showWaveMessage(`WAVE ${wave}`);
   updateHUD();
 }
@@ -600,8 +742,15 @@ function update(timestamp) {
   }
 
   // ── Player shoot (blocked while respawning or invincible-just-spawned blink)
-  if (!respawning && keys[' '] && timestamp - lastBulletTime > BULLET_COOLDOWN) {
-    bullets.push({ x: player.x, y: player.y - player.h / 2, w: 4, h: 16 });
+  const effectiveCooldown = activePowerUps['rapidfire'] && Date.now() < activePowerUps['rapidfire']
+    ? 125 : BULLET_COOLDOWN;
+  if (!respawning && keys[' '] && timestamp - lastBulletTime > effectiveCooldown) {
+    if (activePowerUps['doubleshot'] && Date.now() < activePowerUps['doubleshot']) {
+      bullets.push({ x: player.x - 8, y: player.y - player.h / 2, w: 4, h: 16 });
+      bullets.push({ x: player.x + 8, y: player.y - player.h / 2, w: 4, h: 16 });
+    } else {
+      bullets.push({ x: player.x, y: player.y - player.h / 2, w: 4, h: 16 });
+    }
     lastBulletTime = timestamp;
     playShootSound();
   }
@@ -664,8 +813,16 @@ function update(timestamp) {
 
   // ── Move enemy bullets
   for (let i = enemyBullets.length - 1; i >= 0; i--) {
-    enemyBullets[i].y += ENEMY_BULLET_SPEED;
-    if (enemyBullets[i].y > canvas.height + 20) enemyBullets.splice(i, 1);
+    const b = enemyBullets[i];
+    if (b.vx !== undefined) {
+      b.x += b.vx;
+      b.y += b.vy;
+    } else {
+      b.y += ENEMY_BULLET_SPEED;
+    }
+    if (b.y > canvas.height + 20 || b.x < -20 || b.x > canvas.width + 20) {
+      enemyBullets.splice(i, 1);
+    }
   }
 
   // ── Collision: player bullets vs enemies
@@ -676,9 +833,58 @@ function update(timestamp) {
       if (b.x > e.x && b.x < e.x + e.w && b.y > e.y && b.y < e.y + e.h) {
         e.alive = false;
         bullets.splice(bi, 1);
-        score += (POINTS[e.row] || 10) * (SCORE_MULTIPLIER[difficulty] || 1);
+        score += (POINTS[e.row] || 10) * (SCORE_MULTIPLIER[difficulty] || 1) *
+                 (activePowerUps['scoremult'] && Date.now() < activePowerUps['scoremult'] ? 2 : 1);
         spawnParticles(e.x + e.w / 2, e.y + e.h / 2, e.color);
         playExplosionSound();
+        // 15% chance to spawn a power-up
+        if (Math.random() < 0.15) {
+          const type = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
+          powerUps.push({ x: e.x + e.w / 2, y: e.y + e.h / 2, type });
+        }
+        break;
+      }
+    }
+  }
+
+  // ── Collision: player bullets vs diving enemies
+  for (let bi = bullets.length - 1; bi >= 0; bi--) {
+    const b = bullets[bi];
+    for (let di = divingEnemies.length - 1; di >= 0; di--) {
+      const de = divingEnemies[di];
+      const hw = de.w / 2;
+      const hh = de.h / 2;
+      if (b.x > de.x - hw && b.x < de.x + hw && b.y > de.y - hh && b.y < de.y + hh) {
+        bullets.splice(bi, 1);
+        const pts = (POINTS[de.row] || 10) * DIVE_BONUS * (SCORE_MULTIPLIER[difficulty] || 1) *
+                    (activePowerUps['scoremult'] && Date.now() < activePowerUps['scoremult'] ? 2 : 1);
+        score += pts;
+        floatingTexts.push({ x: de.x, y: de.y, text: `+${pts}`, life: 1.0, decay: 1 / 90 });
+        spawnParticles(de.x, de.y, de.color);
+        playExplosionSound();
+        divingEnemies.splice(di, 1);
+        break;
+      }
+    }
+  }
+
+  // ── Collision: player bullets vs mystery ship
+  if (mysteryShip) {
+    for (let bi = bullets.length - 1; bi >= 0; bi--) {
+      const b = bullets[bi];
+      if (b.x > mysteryShip.x - 40 && b.x < mysteryShip.x + 40 &&
+          b.y > mysteryShip.y - 16 && b.y < mysteryShip.y + 16) {
+        bullets.splice(bi, 1);
+        const bonusOptions = [100, 200, 300, 500];
+        const bonus = bonusOptions[Math.floor(Math.random() * bonusOptions.length)] *
+                      (SCORE_MULTIPLIER[difficulty] || 1);
+        score += bonus;
+        floatingTexts.push({ x: mysteryShip.x, y: mysteryShip.y, text: `+${bonus}`, life: 1.0, decay: 1 / 90 });
+        spawnParticles(mysteryShip.x, mysteryShip.y, '#00ffff');
+        stopMysterySound();
+        playMysteryHitSound();
+        mysteryShip  = null;
+        mysteryTimer = Date.now() + 30000 + Math.random() * 15000;
         break;
       }
     }
@@ -695,6 +901,14 @@ function update(timestamp) {
         b.y > player.y - hh && b.y < player.y + hh
       ) {
         enemyBullets.splice(i, 1);
+
+        // Shield absorbs the hit
+        if (activePowerUps['shield']) {
+          delete activePowerUps['shield'];
+          spawnParticles(player.x, player.y, '#00ff88');
+          break;
+        }
+
         lives--;
         playHitSound();
         spawnPlayerExplosion(player.x, player.y);
@@ -748,7 +962,7 @@ function update(timestamp) {
   }
 
   // ── Wave clear (re-check after bullet collisions may have killed enemies)
-  if (enemies.filter(e => e.alive).length === 0) {
+  if (enemies.filter(e => e.alive).length === 0 && divingEnemies.length === 0) {
     playWaveClearSound();
     wave++;
     const cfg = DIFFICULTY[difficulty] || DIFFICULTY.medium;
@@ -756,8 +970,152 @@ function update(timestamp) {
     shootInterval = Math.max(400, cfg.shootInterval * Math.pow(0.88, wave - 1));
     bullets      = [];
     enemyBullets = [];
+    divingEnemies = [];
+    diveTimer    = Date.now() + 8000 + Math.random() * 4000;
     buildEnemies();
     showWaveMessage(`WAVE ${wave}`);
+  }
+
+  // ── Diving enemies
+  if (wave >= 2 && divingEnemies.length < 2 && Date.now() >= diveTimer) {
+    // Pick a random alive enemy from row 0, fallback to row 1
+    let candidates = enemies.filter(e => e.alive && e.row === 0);
+    if (candidates.length === 0) candidates = enemies.filter(e => e.alive && e.row === 1);
+    if (candidates.length > 0) {
+      const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+      chosen.alive = false; // remove from grid
+      divingEnemies.push({
+        x:       chosen.x + chosen.w / 2,
+        y:       chosen.y + chosen.h / 2,
+        baseX:   chosen.x + chosen.w / 2,
+        baseY:   chosen.y + chosen.h / 2,
+        w:       chosen.w,
+        h:       chosen.h,
+        row:     chosen.row,
+        color:   chosen.color,
+        t:       0,          // bezier parameter 0→1
+        hasFired: false,
+        shotsFired: 0,
+      });
+    }
+    diveTimer = Date.now() + 8000 + Math.random() * 4000;
+  }
+
+  for (let di = divingEnemies.length - 1; di >= 0; di--) {
+    const de = divingEnemies[di];
+    de.t += 0.008; // speed of dive
+
+    // Bezier control points: start at baseX/baseY, swoop toward player X, exit bottom
+    const p0x = de.baseX;
+    const p0y = de.baseY;
+    const p1x = player.x;
+    const p1y = canvas.height * 0.55;
+    const p2x = player.x + (Math.random() < 0.5 ? -80 : 80);
+    const p2y = canvas.height + 60;
+
+    const t = Math.min(de.t, 1);
+    const mt = 1 - t;
+    de.x = mt * mt * p0x + 2 * mt * t * p1x + t * t * p2x;
+    de.y = mt * mt * p0y + 2 * mt * t * p1y + t * t * p2y;
+
+    // Fire 1-2 bullets mid-dive
+    if (!de.hasFired && de.t > 0.35 && de.shotsFired < 2) {
+      const dx = player.x - de.x;
+      const dy = player.y - de.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      enemyBullets.push({
+        x: de.x,
+        y: de.y,
+        w: 6,
+        h: 14,
+        vx: (dx / dist) * ENEMY_BULLET_SPEED,
+        vy: (dy / dist) * ENEMY_BULLET_SPEED,
+      });
+      de.shotsFired++;
+      if (de.shotsFired >= 2) de.hasFired = true;
+      playEnemyShootSound();
+    }
+
+    // Remove when off-screen
+    if (de.y > canvas.height + 80) {
+      divingEnemies.splice(di, 1);
+    }
+  }
+
+  // ── Power-ups: move and collect
+  for (let i = powerUps.length - 1; i >= 0; i--) {
+    const pu = powerUps[i];
+    pu.y += 1.5;
+    if (pu.y > canvas.height + 30) {
+      powerUps.splice(i, 1);
+      continue;
+    }
+    // Check player overlap (30px radius)
+    const dx = pu.x - player.x;
+    const dy = pu.y - player.y;
+    if (!respawning && Math.sqrt(dx * dx + dy * dy) < 30) {
+      // Collect
+      if (pu.type === 'bomb') {
+        // Instantly kill all non-diving enemies
+        for (const e of enemies) {
+          if (e.alive) {
+            score += (POINTS[e.row] || 10) * (SCORE_MULTIPLIER[difficulty] || 1) *
+                     (activePowerUps['scoremult'] && Date.now() < activePowerUps['scoremult'] ? 2 : 1);
+            spawnParticles(e.x + e.w / 2, e.y + e.h / 2, e.color);
+            e.alive = false;
+          }
+        }
+        playExplosionSound();
+      } else if (pu.type === 'shield') {
+        activePowerUps['shield'] = true;
+      } else {
+        activePowerUps[pu.type] = Date.now() + POWERUP_DURATION[pu.type];
+      }
+      playPowerUpSound();
+      powerUps.splice(i, 1);
+    }
+  }
+
+  // ── Mystery ship
+  if (!mysteryShip && Date.now() >= mysteryTimer) {
+    const dir = mysteryDir;
+    mysteryShip = {
+      x:          dir === 1 ? -50 : canvas.width + 50,
+      y:          55,
+      dir,
+      lightFrame: 0,
+    };
+    mysteryDir = -mysteryDir; // alternate direction next time
+    startMysterySound();
+  }
+
+  if (mysteryShip) {
+    mysteryShip.x += mysteryShip.dir * 2.5;
+    mysteryShip.lightFrame++;
+
+    // Warble pitch
+    if (mysteryOsc) {
+      try {
+        const wobble = 440 + 80 * Math.sin(Date.now() / 120);
+        mysteryOsc.frequency.setValueAtTime(wobble, getAudioCtx().currentTime);
+      } catch (_) {}
+    }
+
+    // Off-screen exit
+    if ((mysteryShip.dir === 1 && mysteryShip.x > canvas.width + 60) ||
+        (mysteryShip.dir === -1 && mysteryShip.x < -60)) {
+      stopMysterySound();
+      mysteryShip  = null;
+      mysteryTimer = Date.now() + 30000 + Math.random() * 15000;
+    }
+  }
+
+  // ── Floating texts
+  for (let i = floatingTexts.length - 1; i >= 0; i--) {
+    const ft = floatingTexts[i];
+    ft.y    -= 0.8;
+    ft.life -= ft.decay;
+    if (ft.life <= 0) floatingTexts.splice(i, 1);
   }
 
   // ── Particles
@@ -782,6 +1140,11 @@ function render() {
   // Stars
   drawStars();
 
+  // Mystery ship (above stars, below enemies)
+  if (mysteryShip) {
+    drawMysteryShip(mysteryShip);
+  }
+
   // Enemies
   for (const e of enemies) {
     if (!e.alive) continue;
@@ -805,6 +1168,26 @@ function render() {
   }
   ctx.shadowBlur = 0;
 
+  // Diving enemies (drawn independently, brighter/larger)
+  for (const de of divingEnemies) {
+    ctx.save();
+    ctx.shadowColor = de.color;
+    ctx.shadowBlur  = 24;
+    ctx.translate(de.x, de.y);
+    ctx.scale(1.2, 1.2);
+    ctx.translate(-de.x, -de.y);
+    const flap = Math.floor(animFrame / 14) % 2; // faster flap while diving
+    if (de.row === 0) {
+      drawCommander(de.x, de.y, de.w, de.h, de.color, flap);
+    } else if (de.row === 1) {
+      drawSoldier(de.x, de.y, de.w, de.h, de.color, flap);
+    } else {
+      drawDrone(de.x, de.y, de.w, de.h, de.color, flap);
+    }
+    ctx.restore();
+  }
+  ctx.shadowBlur = 0;
+
   // Enemy bullets (red ovals)
   ctx.fillStyle = '#ff3333';
   for (const b of enemyBullets) {
@@ -824,6 +1207,26 @@ function render() {
   }
   ctx.shadowBlur = 0;
 
+  // Power-ups (above enemies)
+  for (const pu of powerUps) {
+    const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 200);
+    ctx.save();
+    ctx.shadowColor = POWERUP_COLORS[pu.type];
+    ctx.shadowBlur  = 16 * pulse;
+    ctx.fillStyle   = POWERUP_COLORS[pu.type];
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.arc(pu.x, pu.y, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur  = 0;
+    ctx.font        = '14px Arial';
+    ctx.textAlign   = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(POWERUP_ICONS[pu.type], pu.x, pu.y);
+    ctx.restore();
+  }
+
   // Player ship (hidden while respawning, fades in on respawn, blinks during immunity)
   if (!respawning) {
     const blinking   = invincible && Math.floor((Date.now() - flashTimer) / 100) % 2 === 0;
@@ -840,6 +1243,21 @@ function render() {
       ctx.shadowBlur   = 18;
       ctx.beginPath();
       ctx.arc(player.x, player.y, player.w * 0.65, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+    // Green shield power-up ring
+    if (activePowerUps['shield']) {
+      const shieldPulse = 0.5 + 0.5 * Math.abs(Math.sin(Date.now() / 150));
+      ctx.save();
+      ctx.globalAlpha = shieldPulse;
+      ctx.strokeStyle = '#00ff88';
+      ctx.lineWidth   = 4;
+      ctx.shadowColor = '#00ff88';
+      ctx.shadowBlur  = 22;
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, player.w * 0.72, 0, Math.PI * 2);
       ctx.stroke();
       ctx.shadowBlur = 0;
       ctx.restore();
@@ -872,6 +1290,24 @@ function render() {
 
   // ── Graphical lives — small ship icons top-right ──────────
   drawLivesHUD();
+
+  // ── Active power-up status icons (bottom-left) ────────────
+  drawPowerUpHUD();
+
+  // ── Floating score texts (on top) ─────────────────────────
+  for (const ft of floatingTexts) {
+    ctx.save();
+    ctx.globalAlpha  = Math.max(0, ft.life);
+    ctx.font         = 'bold 18px "Segoe UI", Arial, sans-serif';
+    ctx.fillStyle    = '#ffd700';
+    ctx.shadowColor  = '#ffd700';
+    ctx.shadowBlur   = 10;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ft.text, ft.x, ft.y);
+    ctx.shadowBlur   = 0;
+    ctx.restore();
+  }
 
   // Screen flash on hit
   if (respawning) {
@@ -1006,6 +1442,113 @@ function drawLivesHUD() {
 
     ctx.restore();
   }
+}
+
+// ── Active power-up HUD (bottom-left) ───────────────────────
+function drawPowerUpHUD() {
+  const now    = Date.now();
+  const active = [];
+
+  // Timed power-ups
+  for (const type of ['rapidfire', 'doubleshot', 'scoremult']) {
+    if (activePowerUps[type] && now < activePowerUps[type]) {
+      active.push({ type, remaining: activePowerUps[type] - now, total: POWERUP_DURATION[type] });
+    }
+  }
+  // Shield (no timer)
+  if (activePowerUps['shield']) {
+    active.push({ type: 'shield', remaining: -1, total: -1 });
+  }
+
+  if (active.length === 0) return;
+
+  const iconSize = 28;
+  const gap      = 6;
+  const padX     = 14;
+  const padY     = canvas.height - 60;
+
+  active.forEach((item, i) => {
+    const x = padX + i * (iconSize + gap);
+    const y = padY;
+
+    // Background circle
+    ctx.save();
+    ctx.globalAlpha = 0.75;
+    ctx.fillStyle   = POWERUP_COLORS[item.type];
+    ctx.shadowColor = POWERUP_COLORS[item.type];
+    ctx.shadowBlur  = 10;
+    ctx.beginPath();
+    ctx.arc(x + iconSize / 2, y + iconSize / 2, iconSize / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur  = 0;
+    ctx.globalAlpha = 1;
+
+    // Icon
+    ctx.font         = '14px Arial';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(POWERUP_ICONS[item.type], x + iconSize / 2, y + iconSize / 2);
+
+    // Countdown bar (below icon)
+    if (item.remaining > 0 && item.total > 0) {
+      const barW   = iconSize;
+      const barH   = 4;
+      const barY   = y + iconSize + 3;
+      const frac   = item.remaining / item.total;
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.fillRect(x, barY, barW, barH);
+      ctx.fillStyle = POWERUP_COLORS[item.type];
+      ctx.fillRect(x, barY, barW * frac, barH);
+    }
+
+    ctx.restore();
+  });
+}
+
+// ── Mystery ship draw ────────────────────────────────────────
+function drawMysteryShip(ms) {
+  const x = ms.x;
+  const y = ms.y;
+
+  ctx.save();
+  ctx.shadowColor = '#00ffff';
+  ctx.shadowBlur  = 20;
+
+  // Oval body
+  ctx.fillStyle = '#aaddee';
+  ctx.beginPath();
+  ctx.ellipse(x, y + 4, 38, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Dome on top
+  ctx.fillStyle = '#cceeff';
+  ctx.beginPath();
+  ctx.ellipse(x, y - 4, 20, 14, 0, Math.PI, 0);
+  ctx.fill();
+
+  // Dome tint
+  ctx.fillStyle = 'rgba(100,220,255,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(x, y - 4, 20, 14, 0, Math.PI, 0);
+  ctx.fill();
+
+  // Lights underneath (alternating red/yellow every 20 frames)
+  const lightOn = Math.floor(ms.lightFrame / 20) % 2 === 0;
+  const lightColors = lightOn
+    ? ['#ff4444', '#ffff00', '#ff4444', '#ffff00', '#ff4444']
+    : ['#ffff00', '#ff4444', '#ffff00', '#ff4444', '#ffff00'];
+  const lightXs = [-24, -12, 0, 12, 24];
+  lightXs.forEach((lx, i) => {
+    ctx.fillStyle   = lightColors[i];
+    ctx.shadowColor = lightColors[i];
+    ctx.shadowBlur  = 8;
+    ctx.beginPath();
+    ctx.arc(x + lx, y + 14, 4, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.shadowBlur = 0;
+  ctx.restore();
 }
 
 // ── Enemy sprite: Commander (row 0 — 30pts, red) ─────────────
