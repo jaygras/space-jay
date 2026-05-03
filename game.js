@@ -783,44 +783,52 @@ function drawPlayerExplosion() {
 }
 
 // ── Graphical lives HUD — small ship icons top-right ─────────
-const LIFE_ICON_W = 22;
-const LIFE_ICON_H = 28;
-const LIFE_ICON_GAP = 10;
+const LIFE_ICON_W   = 26;
+const LIFE_ICON_H   = 32;
+const LIFE_ICON_GAP = 8;
 
 function drawLivesHUD() {
-  const totalW  = lives * LIFE_ICON_W + (lives - 1) * LIFE_ICON_GAP;
-  const startX  = canvas.width - totalW - 20;
-  const iconY   = 18;
+  // Draw below the HTML HUD bar (which is ~50px tall) so icons aren't hidden under it
+  const iconY  = 58;   // top of icon, below the HUD div
+  const totalW = lives * LIFE_ICON_W + Math.max(0, lives - 1) * LIFE_ICON_GAP;
+  const startX = canvas.width - totalW - 16;
+
+  // "LIVES" label
+  ctx.save();
+  ctx.font        = 'bold 11px "Segoe UI", Arial, sans-serif';
+  ctx.fillStyle   = 'rgba(200,220,255,0.7)';
+  ctx.letterSpacing = '2px';
+  ctx.textAlign   = 'right';
+  ctx.fillText('LIVES', canvas.width - 16, iconY - 4);
+  ctx.restore();
 
   for (let i = 0; i < lives; i++) {
     const icx = startX + i * (LIFE_ICON_W + LIFE_ICON_GAP) + LIFE_ICON_W / 2;
     const icy = iconY + LIFE_ICON_H / 2;
 
-    // Pulse the last remaining life icon when invincible (just respawned)
-    const isLastLife = (lives === 1);
-    const pulse = isLastLife ? (0.7 + 0.3 * Math.sin(Date.now() / 120)) : 1;
+    const isLastLife = lives === 1;
+    const alpha = isLastLife ? (0.6 + 0.4 * Math.abs(Math.sin(Date.now() / 200))) : 1;
 
     ctx.save();
-    ctx.globalAlpha = pulse;
+    ctx.globalAlpha = alpha;
     ctx.shadowColor = '#44eeff';
-    ctx.shadowBlur  = invincible ? 12 : 4;
+    ctx.shadowBlur  = invincible ? 14 : 5;
+    ctx.translate(icx, icy);
+    ctx.rotate(SHIP_ROTATION_OFFSET);
 
     if (shipImgLoaded) {
-      ctx.translate(icx, icy);
-      ctx.rotate(SHIP_ROTATION_OFFSET);
       ctx.drawImage(shipImg, -LIFE_ICON_W / 2, -LIFE_ICON_H / 2, LIFE_ICON_W, LIFE_ICON_H);
     } else {
-      // Fallback mini triangle
+      // Fallback: draw a small triangle pointing up
       ctx.fillStyle = '#44aaff';
       ctx.beginPath();
-      ctx.moveTo(icx, iconY);
-      ctx.lineTo(icx - LIFE_ICON_W / 2, iconY + LIFE_ICON_H);
-      ctx.lineTo(icx + LIFE_ICON_W / 2, iconY + LIFE_ICON_H);
+      ctx.moveTo(0, -LIFE_ICON_H / 2);
+      ctx.lineTo(-LIFE_ICON_W / 2, LIFE_ICON_H / 2);
+      ctx.lineTo(LIFE_ICON_W / 2, LIFE_ICON_H / 2);
       ctx.closePath();
       ctx.fill();
     }
 
-    ctx.shadowBlur = 0;
     ctx.restore();
   }
 }
