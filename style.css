@@ -1,0 +1,225 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #0a0a0a;
+  color: #fff;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* ── Screens ── */
+.screen {
+  display: none;
+  width: 100vw;
+  height: 100vh;
+}
+.screen.active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.screen.overlay {
+  position: fixed;
+  top: 0; left: 0;
+  background: rgba(0,0,0,0.80);
+  z-index: 100;
+}
+
+/* ── Menu ── */
+#menu-screen {
+  background: radial-gradient(ellipse at center, #0d0d2e 0%, #0a0a0a 100%);
+  gap: 20px;
+}
+
+#menu-screen h1 {
+  font-size: 3.5rem;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  color: #f0c040;
+  text-shadow: 0 0 30px #f0c04088, 0 0 60px #f0c04044;
+}
+
+.subtitle {
+  color: #aaa;
+  font-size: 1rem;
+  letter-spacing: 2px;
+}
+
+.menu-options {
+  display: flex;
+  gap: 30px;
+  font-size: 0.9rem;
+  color: #ccc;
+}
+.menu-options label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.menu-options select {
+  background: #222;
+  color: #fff;
+  border: 1px solid #555;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+/* ── Buttons ── */
+.btn-primary {
+  background: #f0c040;
+  color: #000;
+  border: none;
+  padding: 12px 40px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  letter-spacing: 3px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: background 0.2s, transform 0.1s;
+}
+.btn-primary:hover {
+  background: #ffd060;
+  transform: scale(1.04);
+}
+.btn-secondary {
+  background: transparent;
+  color: #aaa;
+  border: 1px solid #555;
+  padding: 10px 30px;
+  font-size: 0.95rem;
+  letter-spacing: 2px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: color 0.2s, border-color 0.2s;
+}
+.btn-secondary:hover {
+  color: #fff;
+  border-color: #aaa;
+}
+.btn-quit {
+  background: transparent;
+  color: #cc3333;
+  border: 1px solid #662222;
+  padding: 10px 30px;
+  font-size: 0.95rem;
+  letter-spacing: 2px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.btn-quit:hover {
+  color: #fff;
+  border-color: #cc3333;
+  background: #cc333322;
+}
+
+/* ── Game Screen ── */
+#game-screen {
+  position: relative;
+  background: #000;
+  justify-content: flex-start;
+}
+
+#game-canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* ── HUD ── */
+#hud {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 10px 20px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%);
+  z-index: 10;
+  pointer-events: none;
+}
+#hud-left, #hud-right {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  letter-spacing: 2px;
+  color: #eee;
+  text-shadow: 0 1px 4px #000;
+}
+#hud-left div, #hud-right div {
+  background: rgba(0,0,0,0.45);
+  padding: 4px 12px;
+  border-radius: 6px;
+}
+#hud-left span, #hud-right span {
+  color: #f0c040;
+  font-weight: bold;
+}
+#hud-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#hud-msg {
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: #f0c040;
+  letter-spacing: 4px;
+  text-shadow: 0 0 16px #f0c04099;
+  text-align: center;
+  min-height: 2rem;
+}
+
+#controls-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.75rem;
+  color: #555;
+  letter-spacing: 1px;
+  pointer-events: none;
+}
+
+/* ── Modal ── */
+.modal {
+  background: #111;
+  border: 2px solid #333;
+  border-radius: 16px;
+  padding: 40px 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  min-width: 340px;
+}
+.modal h2 {
+  font-size: 2rem;
+  letter-spacing: 4px;
+  color: #f0c040;
+}
+#finish-stats {
+  color: #ccc;
+  font-size: 0.95rem;
+  line-height: 2;
+  text-align: center;
+  letter-spacing: 1px;
+}
+#finish-stats .highlight {
+  color: #f0c040;
+  font-weight: bold;
+}

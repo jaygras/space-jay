@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Chrome kiosk temp profile (created at runtime)
+chrome-profile/
+
+# OS
+.DS_Store
+Thumbs.db

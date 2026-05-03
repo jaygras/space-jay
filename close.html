@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Jay-Racing</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0a;
+      color: #fff;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      gap: 24px;
+    }
+    h1 { color: #f0c040; font-size: 2rem; letter-spacing: 4px; }
+    p  { color: #aaa; font-size: 1rem; letter-spacing: 1px; }
+    kbd {
+      background: #222;
+      border: 1px solid #555;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 1rem;
+      color: #fff;
+    }
+    button {
+      background: #cc3333;
+      color: #fff;
+      border: none;
+      padding: 12px 40px;
+      font-size: 1rem;
+      font-weight: bold;
+      letter-spacing: 3px;
+      border-radius: 8px;
+      cursor: pointer;
+      text-transform: uppercase;
+      margin-top: 8px;
+    }
+    button:hover { background: #ee4444; }
+  </style>
+</head>
+<body>
+  <h1>🏁 JAY-RACING</h1>
+  <p>Press <kbd>Alt + F4</kbd> to close the game</p>
+  <button onclick="tryClose()">Close Game</button>
+  <script>
+    function tryClose() {
+      window.close();
+      // If still here, open a blank page (releases kiosk in some configs)
+      setTimeout(() => { window.open('', '_self').close(); }, 200);
+    }
+    // Auto-attempt on load
+    tryClose();
+  </script>
+</body>
+</html>

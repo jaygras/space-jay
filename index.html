@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Space Jay</title>
+  <link rel="icon" href="Space_Shoot.ico" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- MENU SCREEN -->
+  <div id="menu-screen" class="screen active">
+    <h1>🚀 SPACE JAY</h1>
+    <p class="subtitle">Defend the galaxy. Shoot everything.</p>
+    <div class="menu-options">
+      <label>Difficulty:
+        <select id="difficulty">
+          <option value="easy">Easy</option>
+          <option value="medium" selected>Medium</option>
+          <option value="hard">Hard</option>
+        </select>
+      </label>
+    </div>
+    <button id="start-btn" class="btn-primary">START GAME</button>
+    <button class="btn-quit" id="menu-quit-btn" style="margin-top:4px;">Quit Game</button>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div id="game-screen" class="screen">
+    <div id="hud">
+      <div id="hud-left">
+        <div>SCORE <span id="hud-score">0</span></div>
+        <div>WAVE <span id="hud-wave">1</span></div>
+      </div>
+      <div id="hud-center">
+        <div id="hud-msg"></div>
+      </div>
+      <div id="hud-right">
+        <div>HI <span id="hud-hi">0</span></div>
+      </div>
+    </div>
+    <canvas id="game-canvas"></canvas>
+    <div id="controls-hint">
+      ← → Move &nbsp;|&nbsp; SPACE Shoot &nbsp;|&nbsp; ESC Pause
+    </div>
+  </div>
+
+  <!-- PAUSE SCREEN -->
+  <div id="pause-screen" class="screen overlay">
+    <div class="modal">
+      <h2>PAUSED</h2>
+      <button class="btn-primary" id="resume-btn">Resume</button>
+      <button class="btn-secondary" id="pause-menu-btn">Main Menu</button>
+      <button class="btn-quit" id="pause-quit-btn">Quit Game</button>
+    </div>
+  </div>
+
+  <!-- GAME OVER SCREEN -->
+  <div id="finish-screen" class="screen overlay">
+    <div class="modal">
+      <h2 id="finish-title">GAME OVER</h2>
+      <div id="finish-stats"></div>
+      <button class="btn-primary" id="play-again-btn">Play Again</button>
+      <button class="btn-secondary" id="finish-menu-btn">Main Menu</button>
+      <button class="btn-quit" id="finish-quit-btn">Quit Game</button>
+    </div>
+  </div>
+
+  <script src="game.js?v=4"></script>
+
+  <!-- QUIT OVERLAY – shown when window.close() is blocked -->
+  <div id="quit-overlay" style="
+      display:none; position:fixed; inset:0; z-index:999;
+      background:rgba(0,0,0,0.92);
+      flex-direction:column; align-items:center; justify-content:center;
+      gap:24px; font-family:'Segoe UI',Arial,sans-serif; color:#fff;">
+    <div style="font-size:2rem;letter-spacing:4px;color:#f0c040;">🚀 SPACE JAY</div>
+    <div style="font-size:1rem;color:#aaa;letter-spacing:1px;">Press <kbd style="background:#222;border:1px solid #555;border-radius:6px;padding:4px 12px;color:#fff;font-size:1rem;">Alt + F4</kbd> to close</div>
+    <button onclick="window.close()" style="
+        background:#cc3333;color:#fff;border:none;
+        padding:12px 40px;font-size:1rem;font-weight:bold;
+        letter-spacing:3px;border-radius:8px;cursor:pointer;text-transform:uppercase;">
+      Close Game
+    </button>
+    <button onclick="document.getElementById('quit-overlay').style.display='none'" style="
+        background:transparent;color:#aaa;border:1px solid #555;
+        padding:10px 30px;font-size:0.9rem;letter-spacing:2px;
+        border-radius:8px;cursor:pointer;text-transform:uppercase;">
+      Cancel
+    </button>
+  </div>
+</body>
+</html>
