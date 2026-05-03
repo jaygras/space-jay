@@ -1445,22 +1445,14 @@ function render() {
   ctx.shadowBlur = 0;
 
   // Power-ups (above enemies)
+  // Power-ups (above enemies)
   for (const pu of powerUps) {
     const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 200);
     ctx.save();
     ctx.shadowColor = POWERUP_COLORS[pu.type];
-    ctx.shadowBlur  = 16 * pulse;
-    ctx.fillStyle   = POWERUP_COLORS[pu.type];
-    ctx.globalAlpha = 0.85;
-    ctx.beginPath();
-    ctx.arc(pu.x, pu.y, 14, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
+    ctx.shadowBlur  = 18 * pulse;
+    drawPowerUpSprite(ctx, pu.x, pu.y, pu.type, 18, pulse);
     ctx.shadowBlur  = 0;
-    ctx.font        = '14px Arial';
-    ctx.textAlign   = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(POWERUP_ICONS[pu.type], pu.x, pu.y);
     ctx.restore();
   }
 
@@ -1720,11 +1712,13 @@ function drawPowerUpHUD() {
     ctx.shadowBlur  = 0;
     ctx.globalAlpha = 1;
 
-    // Icon
-    ctx.font         = '14px Arial';
-    ctx.textAlign    = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(POWERUP_ICONS[item.type], x + iconSize / 2, y + iconSize / 2);
+    // Icon — canvas-drawn sprite
+    ctx.save();
+    ctx.shadowColor = POWERUP_COLORS[item.type];
+    ctx.shadowBlur  = 8;
+    drawPowerUpSprite(ctx, x + iconSize / 2, y + iconSize / 2, item.type, iconSize * 0.38, 1);
+    ctx.shadowBlur  = 0;
+    ctx.restore();
 
     // Countdown bar (below icon)
     if (item.remaining > 0 && item.total > 0) {
@@ -1740,6 +1734,202 @@ function drawPowerUpHUD() {
 
     ctx.restore();
   });
+}
+
+// ── Power-up sprite renderer ─────────────────────────────────
+// Draws each power-up as a distinct canvas shape at (cx, cy) with radius r.
+// pulse: 0-1 animation value for breathing/spinning effects.
+function drawPowerUpSprite(c, cx, cy, type, r, pulse) {
+  const col = POWERUP_COLORS[type];
+  const dim = col + '55';   // semi-transparent version for fills
+  const now = Date.now();
+
+  c.save();
+  c.strokeStyle = col;
+  c.fillStyle   = col;
+  c.lineWidth   = Math.max(1.5, r * 0.12);
+
+  switch (type) {
+
+    // ── RAPID FIRE — 3 stacked bullets with motion lines ─────
+    case 'rapidfire': {
+      const bw = r * 0.28;
+      const bh = r * 0.55;
+      // Motion lines (left side)
+      c.globalAlpha = 0.5 * pulse;
+      for (let li = 0; li < 3; li++) {
+        const ly = cy - r * 0.5 + li * r * 0.5;
+        c.beginPath();
+        c.moveTo(cx - r * 0.85, ly);
+        c.lineTo(cx - r * 0.45, ly);
+        c.stroke();
+      }
+      c.globalAlpha = 1;
+      // 3 bullets stacked vertically
+      const offsets = [-r * 0.52, 0, r * 0.52];
+      offsets.forEach(oy => {
+        // Bullet body
+        c.fillStyle = col;
+        c.beginPath();
+        c.roundRect(cx - bw/2, cy + oy - bh/2, bw, bh * 0.7, bw * 0.4);
+        c.fill();
+        // Bullet tip (pointed top)
+        c.beginPath();
+        c.moveTo(cx,        cy + oy - bh/2);
+        c.lineTo(cx - bw/2, cy + oy - bh/2 + bh*0.3);
+        c.lineTo(cx + bw/2, cy + oy - bh/2 + bh*0.3);
+        c.closePath();
+        c.fill();
+      });
+      break;
+    }
+
+    // ── DOUBLE SHOT — 2 parallel bullets side by side ────────
+    case 'doubleshot': {
+      const bw = r * 0.28;
+      const bh = r * 0.75;
+      const sep = r * 0.38;
+      [-sep, sep].forEach(ox => {
+        // Bullet body
+        c.fillStyle = col;
+        c.beginPath();
+        c.roundRect(cx + ox - bw/2, cy - bh/2 + bh*0.25, bw, bh * 0.75, bw*0.4);
+        c.fill();
+        // Bullet tip
+        c.beginPath();
+        c.moveTo(cx + ox,        cy - bh/2);
+        c.lineTo(cx + ox - bw/2, cy - bh/2 + bh*0.28);
+        c.lineTo(cx + ox + bw/2, cy - bh/2 + bh*0.28);
+        c.closePath();
+        c.fill();
+      });
+      // Small "x2" indicator
+      c.fillStyle   = col;
+      c.font        = `bold ${Math.max(7, r*0.55)}px "Segoe UI", Arial`;
+      c.textAlign   = 'center';
+      c.textBaseline = 'bottom';
+      c.fillText('×2', cx, cy + r * 0.95);
+      break;
+    }
+
+    // ── SHIELD — dome / concentric arcs ──────────────────────
+    case 'shield': {
+      // Outer dome arc
+      c.globalAlpha = 0.35 + 0.2 * pulse;
+      c.fillStyle   = col;
+      c.beginPath();
+      c.arc(cx, cy + r * 0.2, r * 0.85, Math.PI, 0);
+      c.lineTo(cx + r * 0.85, cy + r * 0.2);
+      c.lineTo(cx - r * 0.85, cy + r * 0.2);
+      c.closePath();
+      c.fill();
+
+      c.globalAlpha = 1;
+      // Dome outline
+      c.beginPath();
+      c.arc(cx, cy + r * 0.2, r * 0.85, Math.PI, 0);
+      c.stroke();
+      // Base line
+      c.beginPath();
+      c.moveTo(cx - r * 0.85, cy + r * 0.2);
+      c.lineTo(cx + r * 0.85, cy + r * 0.2);
+      c.stroke();
+      // Inner arc (second layer)
+      c.globalAlpha = 0.6;
+      c.beginPath();
+      c.arc(cx, cy + r * 0.2, r * 0.52, Math.PI, 0);
+      c.stroke();
+      c.globalAlpha = 1;
+      // Centre cross-bar
+      c.beginPath();
+      c.moveTo(cx, cy + r * 0.2);
+      c.lineTo(cx, cy - r * 0.65);
+      c.stroke();
+      break;
+    }
+
+    // ── BOMB — circle with fuse spark on top ─────────────────
+    case 'bomb': {
+      // Main bomb body
+      c.globalAlpha = 0.3;
+      c.fillStyle   = col;
+      c.beginPath();
+      c.arc(cx, cy + r * 0.1, r * 0.72, 0, Math.PI * 2);
+      c.fill();
+      c.globalAlpha = 1;
+      c.beginPath();
+      c.arc(cx, cy + r * 0.1, r * 0.72, 0, Math.PI * 2);
+      c.stroke();
+
+      // Fuse line (wiggly)
+      c.beginPath();
+      c.moveTo(cx + r * 0.35, cy - r * 0.55);
+      c.quadraticCurveTo(cx + r * 0.6, cy - r * 0.85,
+                         cx + r * 0.3, cy - r * 1.0);
+      c.stroke();
+
+      // Spark at fuse tip — flickers with pulse
+      const sparkR = r * 0.14 * pulse;
+      c.fillStyle   = '#ffffff';
+      c.shadowColor = '#ffffff';
+      c.shadowBlur  = 8 * pulse;
+      c.beginPath();
+      c.arc(cx + r * 0.3, cy - r * 1.0, sparkR, 0, Math.PI * 2);
+      c.fill();
+      c.shadowBlur = 0;
+
+      // Shine on bomb
+      c.fillStyle   = 'rgba(255,255,255,0.25)';
+      c.beginPath();
+      c.arc(cx - r * 0.22, cy - r * 0.12, r * 0.22, 0, Math.PI * 2);
+      c.fill();
+      break;
+    }
+
+    // ── SCORE MULT — ×2 inside a star outline ────────────────
+    case 'scoremult': {
+      // Spinning star outline
+      const spin    = (now / 1800) % (Math.PI * 2);
+      const points  = 5;
+      const outerR  = r * 0.92;
+      const innerR  = r * 0.42;
+
+      c.globalAlpha = 0.25 + 0.15 * pulse;
+      c.fillStyle   = col;
+      c.beginPath();
+      for (let i = 0; i < points * 2; i++) {
+        const angle = spin + (i * Math.PI) / points - Math.PI / 2;
+        const rad   = i % 2 === 0 ? outerR : innerR;
+        i === 0
+          ? c.moveTo(cx + Math.cos(angle)*rad, cy + Math.sin(angle)*rad)
+          : c.lineTo(cx + Math.cos(angle)*rad, cy + Math.sin(angle)*rad);
+      }
+      c.closePath();
+      c.fill();
+
+      c.globalAlpha = 1;
+      c.beginPath();
+      for (let i = 0; i < points * 2; i++) {
+        const angle = spin + (i * Math.PI) / points - Math.PI / 2;
+        const rad   = i % 2 === 0 ? outerR : innerR;
+        i === 0
+          ? c.moveTo(cx + Math.cos(angle)*rad, cy + Math.sin(angle)*rad)
+          : c.lineTo(cx + Math.cos(angle)*rad, cy + Math.sin(angle)*rad);
+      }
+      c.closePath();
+      c.stroke();
+
+      // ×2 text in centre
+      c.fillStyle    = col;
+      c.font         = `bold ${Math.max(8, r * 0.65)}px "Segoe UI", Arial`;
+      c.textAlign    = 'center';
+      c.textBaseline = 'middle';
+      c.fillText('×2', cx, cy);
+      break;
+    }
+  }
+
+  c.restore();
 }
 
 // ── Mystery ship draw ────────────────────────────────────────
