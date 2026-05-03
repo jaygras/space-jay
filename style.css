@@ -32,10 +32,86 @@ body {
   z-index: 100;
 }
 
-/* ── Menu ── */
+/* ─────────────────────────────────────────────
+   SPLASH SCREEN
+───────────────────────────────────────────── */
+#splash-screen {
+  background: #000;
+  cursor: none;
+}
+
+#splash-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  opacity: 0;
+  animation: splashFadeIn 0.8s ease-out 0.3s forwards,
+             splashFadeOut 0.6s ease-in 2.8s forwards;
+}
+
+#splash-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+#splash-icon {
+  font-size: 4rem;
+  filter: drop-shadow(0 0 24px rgba(240,192,64,0.6));
+  animation: splashIconPulse 1.5s ease-in-out infinite;
+}
+
+#splash-studio {
+  font-size: 1.6rem;
+  font-weight: 900;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  color: #f0c040;
+  text-shadow: 0 0 30px #f0c04088, 0 0 60px #f0c04033;
+}
+
+#splash-tagline {
+  font-size: 0.85rem;
+  letter-spacing: 5px;
+  color: #666;
+  text-transform: lowercase;
+  font-style: italic;
+}
+
+@keyframes splashFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes splashFadeOut {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(1.04); }
+}
+@keyframes splashIconPulse {
+  0%, 100% { transform: scale(1);    filter: drop-shadow(0 0 20px rgba(240,192,64,0.5)); }
+  50%       { transform: scale(1.08); filter: drop-shadow(0 0 40px rgba(240,192,64,0.9)); }
+}
+
+/* ─────────────────────────────────────────────
+   MENU SCREEN
+───────────────────────────────────────────── */
 #menu-screen {
   background: radial-gradient(ellipse at center, #0d0d2e 0%, #0a0a0a 100%);
-  gap: 20px;
+  gap: 18px;
+  position: relative;
+}
+
+/* Studio badge above the game title */
+#menu-studio-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  color: #f0c040;
+  opacity: 0.75;
+  margin-bottom: -10px;
 }
 
 #menu-screen h1 {
@@ -50,6 +126,16 @@ body {
   color: #aaa;
   font-size: 1rem;
   letter-spacing: 2px;
+}
+
+/* Copyright line at the very bottom of the menu */
+#menu-copyright {
+  position: absolute;
+  bottom: 18px;
+  font-size: 0.7rem;
+  letter-spacing: 2px;
+  color: #333;
+  text-transform: uppercase;
 }
 
 .menu-options {
@@ -222,4 +308,13 @@ body {
 #finish-stats .highlight {
   color: #f0c040;
   font-weight: bold;
+}
+
+/* Studio credit inside game-over / win modal */
+.modal-studio-credit {
+  font-size: 0.65rem;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #444;
+  margin-top: -8px;
 }

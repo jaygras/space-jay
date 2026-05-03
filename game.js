@@ -1152,6 +1152,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialise hi-score display on menu
   document.getElementById('hud-hi') && (document.getElementById('hud-hi').textContent = hiScore);
 
+  // ── Splash screen — auto-advance to menu after animation (3.6s total)
+  // CSS: fade-in at 0.3s, fade-out starts at 2.8s, ends at 3.4s
+  setTimeout(() => {
+    showScreen('menu-screen');
+  }, 3500);
+
   // Start button
   document.getElementById('start-btn').addEventListener('click', () => {
     startGame();
