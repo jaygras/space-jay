@@ -96,6 +96,7 @@ let enemySpeed = 1.0;
 // Shooting timers
 let lastBulletTime  = 0;
 let lastEnemyShot   = 0;
+let lastShotTime    = Date.now(); // tracks last shot by player or enemy (for wave timeout)
 let shootInterval   = 1600;
 
 // Wave message
@@ -829,6 +830,7 @@ function initGame() {
   playerExplosion = [];
   lastBulletTime  = 0;
   lastEnemyShot   = 0;
+  lastShotTime    = Date.now();
 
   // New feature state
   divingEnemies  = [];
@@ -959,6 +961,7 @@ function update(timestamp) {
       bullets.push({ x: player.x, y: player.y - player.h / 2, w: 4, h: 16 });
     }
     lastBulletTime = timestamp;
+    lastShotTime   = Date.now();
     playShootSound();
   }
 
@@ -1010,6 +1013,7 @@ function update(timestamp) {
     const shooter = shootCandidates[Math.floor(Math.random() * shootCandidates.length)];
     spawnEnemyShot(shooter);
     lastEnemyShot = timestamp;
+    lastShotTime  = Date.now();
   }
 
   // ── Move enemy bullets
@@ -1070,8 +1074,8 @@ function update(timestamp) {
                  (activePowerUps['scoremult'] && Date.now() < activePowerUps['scoremult'] ? 2 : 1);
         spawnParticles(e.x + e.w / 2, e.y + e.h / 2, e.color);
         playExplosionSound();
-        // 15% chance to spawn a power-up
-        if (Math.random() < 0.15) {
+        // 7.5% chance to spawn a power-up (halved from 15%)
+        if (Math.random() < 0.075) {
           const type = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
           powerUps.push({ x: e.x + e.w / 2, y: e.y + e.h / 2, type });
         }
@@ -1251,6 +1255,7 @@ function update(timestamp) {
       });
       de.shotsFired++;
       if (de.shotsFired >= 2) de.hasFired = true;
+      lastShotTime = Date.now();
       playEnemyShootSound();
     }
 
@@ -1278,7 +1283,14 @@ function update(timestamp) {
   }
 
   // ── Wave clear — checked AFTER dive loop so last diving enemy removal is caught
-  if (enemies.filter(e => e.alive).length === 0 && divingEnemies.length === 0) {
+  // Normal clear: all grid enemies dead and no divers remain.
+  // Timeout clear: all grid enemies dead and no shots fired by anyone for 5 s
+  //   (handles the edge case where the last diver loops off-screen indefinitely).
+  const gridClear   = enemies.filter(e => e.alive).length === 0;
+  const diversClear = divingEnemies.length === 0;
+  const silentFor5s = gridClear && (Date.now() - lastShotTime) > 5000;
+
+  if (gridClear && (diversClear || silentFor5s)) {
     playWaveClearSound();
     wave++;
     const cfg = DIFFICULTY[difficulty] || DIFFICULTY.medium;
