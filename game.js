@@ -561,34 +561,123 @@ function buildEnemies() {
 }
 
 // ── Bunkers ──────────────────────────────────────────────────
-const BUNKER_COLS   = 6;
-const BUNKER_ROWS_G = 4;  // grid rows per bunker (avoid name clash with ENEMY_ROWS)
-const BUNKER_W      = 80;
-const BUNKER_H      = 50;
 const BUNKER_COUNT  = 4;
+
+// Landmark bunker templates (1 = solid, 0 = empty)
+// Each landmark has its own grid pattern
+const LANDMARK_TEMPLATES = {
+  // Statue of Liberty (tall, narrow with torch)
+  liberty: {
+    grid: [
+      [0,0,0,1,1,0,0,0],  // torch flame
+      [0,0,0,1,1,0,0,0],  // torch
+      [0,0,0,1,1,0,0,0],  // arm
+      [0,1,1,1,1,1,1,0],  // crown
+      [0,1,1,1,1,1,1,0],  // head
+      [0,0,1,1,1,1,0,0],  // body
+      [0,0,1,1,1,1,0,0],  // body
+      [0,1,1,1,1,1,1,0],  // robe
+      [0,1,1,1,1,1,1,0],  // base
+      [1,1,1,1,1,1,1,1],  // pedestal
+    ],
+    w: 70,
+    h: 90,
+  },
+  
+  // Gateway Arch (wide, curved)
+  arch: {
+    grid: [
+      [0,0,1,1,1,1,1,1,1,1,0,0],
+      [0,1,1,0,0,0,0,0,0,1,1,0],
+      [1,1,0,0,0,0,0,0,0,0,1,1],
+      [1,1,0,0,0,0,0,0,0,0,1,1],
+      [1,1,0,0,0,0,0,0,0,0,1,1],
+      [1,1,0,0,0,0,0,0,0,0,1,1],
+      [1,1,1,0,0,0,0,0,0,1,1,1],
+    ],
+    w: 100,
+    h: 60,
+  },
+  
+  // Capitol Dome (rounded, symmetrical)
+  capitol: {
+    grid: [
+      [0,0,0,1,1,1,1,0,0,0],  // spire
+      [0,0,1,1,1,1,1,1,0,0],  // dome top
+      [0,1,1,1,1,1,1,1,1,0],  // dome
+      [1,1,1,1,1,1,1,1,1,1],  // dome base
+      [0,1,1,1,1,1,1,1,1,0],  // rotunda
+      [0,1,1,1,1,1,1,1,1,0],  // building
+      [1,1,1,1,1,1,1,1,1,1],  // columns
+      [1,1,1,1,1,1,1,1,1,1],  // base
+    ],
+    w: 85,
+    h: 70,
+  },
+  
+  // Space Needle (tall with observation deck)
+  needle: {
+    grid: [
+      [0,0,0,1,1,0,0,0],  // spire
+      [0,0,0,1,1,0,0,0],  // spire
+      [0,1,1,1,1,1,1,0],  // top ring
+      [1,1,1,1,1,1,1,1],  // observation deck
+      [1,1,1,1,1,1,1,1],  // observation deck
+      [0,1,1,1,1,1,1,0],  // deck bottom
+      [0,0,1,1,1,1,0,0],  // shaft
+      [0,0,1,1,1,1,0,0],  // shaft
+      [0,0,1,1,1,1,0,0],  // shaft
+      [0,1,1,1,1,1,1,0],  // base
+    ],
+    w: 70,
+    h: 90,
+  },
+};
+
+// Order of landmarks for the 4 bunkers (left to right)
+const BUNKER_LANDMARKS = ['liberty', 'arch', 'capitol', 'needle'];
 
 function buildBunkers() {
   bunkers = [];
-  const totalBunkerW = BUNKER_COUNT * BUNKER_W;
-  const spacing      = (canvas.width - totalBunkerW) / (BUNKER_COUNT + 1);
-  const bunkerY      = canvas.height * 0.72;
+  
+  // Calculate total width needed for all bunkers
+  const totalBunkerW = BUNKER_LANDMARKS.reduce((sum, name) => 
+    sum + LANDMARK_TEMPLATES[name].w, 0);
+  const spacing = (canvas.width - totalBunkerW) / (BUNKER_COUNT + 1);
+  const bunkerY = canvas.height * 0.72;
 
+  let currentX = spacing;
+  
   for (let b = 0; b < BUNKER_COUNT; b++) {
-    const bx     = spacing + b * (BUNKER_W + spacing);
+    const landmarkName = BUNKER_LANDMARKS[b];
+    const template = LANDMARK_TEMPLATES[landmarkName];
+    const grid = template.grid;
+    const rows = grid.length;
+    const cols = grid[0].length;
+    
+    // Build chunks from template
     const chunks = [];
-    for (let row = 0; row < BUNKER_ROWS_G; row++) {
-      for (let col = 0; col < BUNKER_COLS; col++) {
-        chunks.push({ alive: true, row, col });
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        if (grid[row][col] === 1) {
+          chunks.push({ alive: true, row, col });
+        }
       }
     }
+    
     bunkers.push({
-      x:         bx,
+      x:         currentX,
       y:         bunkerY,
-      w:         BUNKER_W,
-      h:         BUNKER_H,
-      maxHealth: BUNKER_COLS * BUNKER_ROWS_G,
+      w:         template.w,
+      h:         template.h,
+      rows:      rows,
+      cols:      cols,
+      maxHealth: chunks.length,
       chunks,
+      landmark:  landmarkName,
     });
+    
+    currentX += template.w + spacing;
   }
 }
 
@@ -604,17 +693,18 @@ function bunkerColor(bunker) {
 
 /** Hit a bunker at world coords (bx, by). Returns true if a chunk was hit. */
 function hitBunker(bunker, bx, by) {
-  const chunkW = bunker.w / BUNKER_COLS;
-  const chunkH = bunker.h / BUNKER_ROWS_G;
+  const chunkW = bunker.w / bunker.cols;
+  const chunkH = bunker.h / bunker.rows;
   const col    = Math.floor((bx - bunker.x) / chunkW);
   const row    = Math.floor((by - bunker.y) / chunkH);
-  if (col < 0 || col >= BUNKER_COLS || row < 0 || row >= BUNKER_ROWS_G) return false;
+  if (col < 0 || col >= bunker.cols || row < 0 || row >= bunker.rows) return false;
 
-  const idx = row * BUNKER_COLS + col;
-  if (!bunker.chunks[idx].alive) return false;
+  // Find the chunk at this position
+  const chunkIdx = bunker.chunks.findIndex(c => c.row === row && c.col === col && c.alive);
+  if (chunkIdx === -1) return false;
 
   // Kill the hit chunk
-  bunker.chunks[idx].alive = false;
+  bunker.chunks[chunkIdx].alive = false;
 
   // Kill 1-2 random neighbours for natural crumbling
   const neighbours = [];
@@ -622,9 +712,9 @@ function hitBunker(bunker, bx, by) {
   for (const [dr, dc] of dirs) {
     const nr = row + dr;
     const nc = col + dc;
-    if (nr >= 0 && nr < BUNKER_ROWS_G && nc >= 0 && nc < BUNKER_COLS) {
-      const ni = nr * BUNKER_COLS + nc;
-      if (bunker.chunks[ni].alive) neighbours.push(ni);
+    if (nr >= 0 && nr < bunker.rows && nc >= 0 && nc < bunker.cols) {
+      const ni = bunker.chunks.findIndex(c => c.row === nr && c.col === nc && c.alive);
+      if (ni !== -1) neighbours.push(ni);
     }
   }
   const killCount = 1 + Math.floor(Math.random() * 2); // 1 or 2
@@ -638,11 +728,11 @@ function hitBunker(bunker, bx, by) {
 }
 
 function drawBunkers() {
-  const chunkW = BUNKER_W / BUNKER_COLS;
-  const chunkH = BUNKER_H / BUNKER_ROWS_G;
-
   for (const bunker of bunkers) {
+    const chunkW = bunker.w / bunker.cols;
+    const chunkH = bunker.h / bunker.rows;
     const color = bunkerColor(bunker);
+    
     for (const chunk of bunker.chunks) {
       if (!chunk.alive) continue;
       const cx = bunker.x + chunk.col * chunkW;
